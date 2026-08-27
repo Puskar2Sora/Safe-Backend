@@ -1,0 +1,18 @@
+[
+  {
+    "id": "138a444d-d707-41e8-850c-40a8e7c57d40",
+    "userId": "a2428c9e-f849-4367-a0e9-9c9ffba45aa5",
+    "latitude": 22.587120157136635,
+    "longitude": 88.44109461618187,
+    "timestamp": "2026-08-23T12:47:30.670Z",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "a982e132-d64e-4f2c-bf32-a8e6f565184f",
+    "userId": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "latitude": 22.58714462778857,
+    "longitude": 88.44109878731572,
+    "timestamp": "2026-08-23T13:47:54.435Z",
+    "status": "ACTIVE"
+  }
+]

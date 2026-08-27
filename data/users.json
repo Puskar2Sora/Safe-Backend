@@ -1,0 +1,23 @@
+[
+  {
+    "id": "9628176c-1377-4fbc-bf71-002e85c62e66",
+    "name": "Login Test",
+    "email": "login.validation@example.com",
+    "password": "simplepass",
+    "phone": "555-0101"
+  },
+  {
+    "id": "a2428c9e-f849-4367-a0e9-9c9ffba45aa5",
+    "name": "Puskar Nath",
+    "email": "puskarnath110@gmail.com",
+    "password": "916345",
+    "phone": "9163453062"
+  },
+  {
+    "id": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "name": "Test1",
+    "email": "puskar1@gmail.com",
+    "password": "916345",
+    "phone": "1234567896"
+  }
+]

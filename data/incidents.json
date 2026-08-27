@@ -1,0 +1,22 @@
+[
+  {
+    "id": "809c1270-d3fd-4980-bca4-ec869b9ca16c",
+    "latitude": 22.7191072,
+    "longitude": 88.4826229,
+    "category": "Unsafe Road",
+    "severity": "HIGH",
+    "description": "Very unsafe after 7.00 pm",
+    "location": "Barasat, Kolkata Metropolitan Area, Barasat - I, North 24 Parganas, West Bengal, 700124, India",
+    "date": "2026-08-23T12:34:29.250Z"
+  },
+  {
+    "id": "15e1885e-e48b-40c0-b472-ce94955299af",
+    "latitude": 22.6393342,
+    "longitude": 88.4310385,
+    "category": "Poor Lighting",
+    "severity": "HIGH",
+    "description": "Khub kharap Light",
+    "location": "CGHS Wellness Centre Airport Dispensary, Jessore Road, Gorabazar, Dum Dum, Kolkata Metropolitan Area, Barrackpur - II, Kolkata, West Bengal, 700052, India",
+    "date": "2026-08-26T10:44:20.898Z"
+  }
+]

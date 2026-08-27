@@ -1,0 +1,16 @@
+[
+  {
+    "id": "6cc1263a-7154-406d-9304-6f2fefab173a",
+    "userId": "a2428c9e-f849-4367-a0e9-9c9ffba45aa5",
+    "name": "Premasish Nath",
+    "phone": "9088832588",
+    "relationship": "Dad"
+  },
+  {
+    "id": "44a2b5c4-2a6e-4cc7-b3e9-5e43694924a5",
+    "userId": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "name": "Dad",
+    "phone": "1234678985",
+    "relationship": "Dad"
+  }
+]
