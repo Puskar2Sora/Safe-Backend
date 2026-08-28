@@ -22,5 +22,13 @@
     "longitude": 88.41601984263124,
     "timestamp": "2026-08-27T17:22:41.197Z",
     "status": "ACTIVE"
+  },
+  {
+    "id": "a5700585-ceb5-4fa5-9d9d-65ff17ace641",
+    "userId": "83c0104a-a471-41f9-a05c-3c5a37263874",
+    "latitude": 22.612330240204585,
+    "longitude": 88.41601572299032,
+    "timestamp": "2026-08-28T17:54:08.615Z",
+    "status": "ACTIVE"
   }
 ]
