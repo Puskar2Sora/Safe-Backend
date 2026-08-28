@@ -38,7 +38,6 @@ router.post('/', (req, res) => {
   if (!statuses.includes(status)) {
     return res.status(400).json({ success: false, message: 'Invalid journey status' })
   }
-
   const journey = { id: crypto.randomUUID(), userId, origin, destination, selectedRoute, startTime, status, riskScore }
   const journeys = readJourneys()
   journeys.push(journey)

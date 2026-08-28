@@ -1,4 +1,5 @@
 const geocodingUrl = 'https://nominatim.openstreetmap.org/search'
+const reverseGeocodingUrl = 'https://nominatim.openstreetmap.org/reverse'
 const routingUrl = 'https://router.project-osrm.org/route/v1/driving'
 
 async function fetchWithRetry(url, options = {}) {
@@ -28,10 +29,22 @@ async function geocodeLocation(location) {
   if (!results.length) throw new Error(`Could not find a location for "${location}"`)
 
   return {
-    latitude: Number(results[0].lat),
-    longitude: Number(results[0].lon),
-    displayName: results[0].display_name,
+    latitude: Number(result.lat),
+    longitude: Number(result.lon),
+    displayName: result.display_name,
   }
+}
+
+async function reverseGeocodeLocation(latitude, longitude) {
+  const response = await fetchWithRetry(`${reverseGeocodingUrl}?format=jsonv2&zoom=18&lat=${latitude}&lon=${longitude}`, {
+    headers: { 'User-Agent': "Women's Safety Platform MVP" },
+  })
+
+  if (!response.ok) throw new Error('Location lookup service is unavailable')
+  const result = await response.json()
+  if (!result.display_name) throw new Error('Could not identify your current location')
+
+  return { latitude, longitude, displayName: result.display_name }
 }
 
 async function findRoute(from, to) {
@@ -79,4 +92,4 @@ async function findRoute(from, to) {
   }
 }
 
-module.exports = { findRoute, geocodeLocation }
+module.exports = { findRoute, geocodeLocation, reverseGeocodeLocation }

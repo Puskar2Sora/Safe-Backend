@@ -1,8 +1,23 @@
 const express = require('express')
-const { findRoute } = require('../services/routingService')
+const { findRoute, reverseGeocodeLocation } = require('../services/routingService')
 const { scoreRoutes } = require('../services/safetyScoringService')
 
 const router = express.Router()
+
+router.get('/reverse', async (req, res) => {
+  const latitude = Number(req.query.latitude)
+  const longitude = Number(req.query.longitude)
+  const coordinatesAreValid = Number.isFinite(latitude) && Number.isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180
+
+  if (!coordinatesAreValid) return res.status(400).json({ success: false, message: 'Valid coordinates are required' })
+
+  try {
+    const location = await reverseGeocodeLocation(latitude, longitude)
+    return res.json({ success: true, location })
+  } catch (error) {
+    return res.status(502).json({ success: false, message: error instanceof Error ? error.message : 'Unable to identify your location' })
+  }
+})
 
 router.post('/', async (req, res) => {
   const { from, to } = req.body
