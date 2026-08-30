@@ -18,5 +18,25 @@
     "description": "Khub kharap Light",
     "location": "CGHS Wellness Centre Airport Dispensary, Jessore Road, Gorabazar, Dum Dum, Kolkata Metropolitan Area, Barrackpur - II, Kolkata, West Bengal, 700052, India",
     "date": "2026-08-26T10:44:20.898Z"
+  },
+  {
+    "id": "02126bb4-d7c0-4969-8a72-91981645cef8",
+    "latitude": -27.0448424,
+    "longitude": -65.3657954,
+    "category": "Harassment",
+    "severity": "MODERATE",
+    "description": "jngjngntg",
+    "location": "Tucumán, Argentina",
+    "date": "2026-08-30T11:10:58.118Z"
+  },
+  {
+    "id": "a7dc8a60-afd1-4503-bb00-0e20136cc76f",
+    "latitude": 43.1428414,
+    "longitude": -7.3218753,
+    "category": "Harassment",
+    "severity": "MODERATE",
+    "description": "gtgg",
+    "location": "Pol, Meira, Lugo, Galicia, España",
+    "date": "2026-08-30T11:11:22.370Z"
   }
 ]

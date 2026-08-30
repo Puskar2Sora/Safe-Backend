@@ -1,8 +1,32 @@
 const express = require('express')
-const { findRoute, reverseGeocodeLocation } = require('../services/routingService')
+const { findRoute, reverseGeocodeLocation, searchLocations } = require('../services/routingService')
 const { scoreRoutes } = require('../services/safetyScoringService')
 
 const router = express.Router()
+
+router.get('/search', async (req, res) => {
+  const query = req.query.q
+  if (!query || typeof query !== 'string' || !query.trim()) {
+    return res.json({ success: true, suggestions: [] })
+  }
+
+  const latitude = req.query.lat ? Number(req.query.lat) : null
+  const longitude = req.query.lon ? Number(req.query.lon) : null
+  const userCoords = Number.isFinite(latitude) && Number.isFinite(longitude)
+    ? { latitude, longitude }
+    : null
+
+  try {
+    const suggestions = await searchLocations(query, userCoords)
+    return res.json({ success: true, suggestions })
+  } catch (error) {
+    return res.status(502).json({
+      success: false,
+      message: error instanceof Error ? error.message : 'Unable to search locations',
+      suggestions: [],
+    })
+  }
+})
 
 router.get('/reverse', async (req, res) => {
   const latitude = Number(req.query.latitude)

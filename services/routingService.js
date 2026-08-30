@@ -27,6 +27,7 @@ async function geocodeLocation(location) {
   if (!response.ok) throw new Error('Geocoding service is unavailable')
   const results = await response.json()
   if (!results.length) throw new Error(`Could not find a location for "${location}"`)
+  const [result] = results
 
   return {
     latitude: Number(result.lat),
@@ -92,4 +93,59 @@ async function findRoute(from, to) {
   }
 }
 
-module.exports = { findRoute, geocodeLocation, reverseGeocodeLocation }
+async function searchLocations(query, userCoords = null) {
+  if (!query || typeof query !== 'string' || !query.trim()) {
+    return []
+  }
+
+  let url = `${geocodingUrl}?format=jsonv2&limit=8&addressdetails=1&q=${encodeURIComponent(query.trim())}`
+
+  if (userCoords && Number.isFinite(userCoords.latitude) && Number.isFinite(userCoords.longitude)) {
+    const lat = userCoords.latitude
+    const lon = userCoords.longitude
+    const left = lon - 1.0
+    const right = lon + 1.0
+    const top = lat + 1.0
+    const bottom = lat - 1.0
+    url += `&viewbox=${left},${top},${right},${bottom}&bounded=0`
+  }
+
+  const response = await fetchWithRetry(url, {
+    headers: { 'User-Agent': "Women's Safety Platform MVP" },
+  })
+
+  if (!response.ok) return []
+  const results = await response.json()
+  if (!Array.isArray(results)) return []
+
+  return results.map((item) => {
+    const name = item.name || item.address?.amenity || item.address?.shop || item.address?.building || item.address?.road || item.address?.suburb || item.address?.city || item.display_name.split(',')[0]
+    const fullDisplayName = item.display_name
+
+    let subtitle = ''
+    if (fullDisplayName.startsWith(name)) {
+      subtitle = fullDisplayName.slice(name.length).replace(/^[,\s]+/, '')
+    } else {
+      subtitle = [
+        item.address?.suburb || item.address?.neighbourhood,
+        item.address?.city || item.address?.town || item.address?.municipality,
+        item.address?.state,
+        item.address?.country,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    }
+
+    return {
+      placeId: item.place_id,
+      name: name || item.display_name,
+      subtitle: subtitle || item.display_name,
+      displayName: item.display_name,
+      latitude: Number(item.lat),
+      longitude: Number(item.lon),
+      type: item.type || item.category || 'location',
+    }
+  })
+}
+
+module.exports = { findRoute, geocodeLocation, reverseGeocodeLocation, searchLocations }
