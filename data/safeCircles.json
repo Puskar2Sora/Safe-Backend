@@ -1,1 +1,101 @@
-[]
+[
+  {
+    "id": "d1b3d517-1078-478a-af17-34e3000bee22",
+    "creatorId": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "name": "My Safe Circle",
+    "status": "EXPIRED",
+    "maxMembers": 5,
+    "createdAt": "2026-08-27T07:49:11.738Z",
+    "expiresAt": "2026-08-27T08:49:11.738Z",
+    "latitude": 22.58730231074926,
+    "longitude": 88.44105398097214
+  },
+  {
+    "id": "3356e816-1cc5-4c7f-9bf2-2ed2493f3d09",
+    "creatorId": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "name": "My Safe Circle",
+    "status": "EXPIRED",
+    "maxMembers": 5,
+    "createdAt": "2026-08-27T07:57:54.409Z",
+    "expiresAt": "2026-08-27T08:57:54.409Z",
+    "latitude": 22.587229672027757,
+    "longitude": 88.44112706201801
+  },
+  {
+    "id": "ba04417b-f5a9-4b2d-af48-3c91540f2fc2",
+    "creatorId": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "name": "My Safe Circle",
+    "status": "EXPIRED",
+    "maxMembers": 5,
+    "createdAt": "2026-08-27T07:58:18.129Z",
+    "expiresAt": "2026-08-27T08:58:18.129Z",
+    "latitude": 22.58738809408011,
+    "longitude": 88.44100648522836
+  },
+  {
+    "id": "7e242bde-404a-4a24-b44d-516736ae3885",
+    "creatorId": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "name": "My Safe Circle",
+    "status": "EXPIRED",
+    "maxMembers": 5,
+    "createdAt": "2026-08-27T07:59:53.307Z",
+    "expiresAt": "2026-08-27T08:59:53.307Z",
+    "latitude": 22.587155660344727,
+    "longitude": 88.44124132305642
+  },
+  {
+    "id": "4616052d-bf24-4003-80ee-d8b9bd23e7a7",
+    "creatorId": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "name": "My Safe Circle45",
+    "status": "EXPIRED",
+    "maxMembers": 5,
+    "createdAt": "2026-08-27T08:17:02.502Z",
+    "expiresAt": "2026-08-27T09:17:02.502Z",
+    "latitude": 22.587253725483563,
+    "longitude": 88.4411291827079
+  },
+  {
+    "id": "9a9a1d4a-d616-41a9-a526-4bbf46c3c5a8",
+    "creatorId": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "name": "My Safe Circle",
+    "status": "ACTIVE",
+    "maxMembers": 5,
+    "createdAt": "2026-08-30T02:30:27.568Z",
+    "expiresAt": "2026-08-30T03:30:27.568Z",
+    "latitude": 22.58730167963048,
+    "longitude": 88.44112944778301
+  },
+  {
+    "id": "8b4ec2ae-0ca9-4f28-946b-1c34047d68d1",
+    "creatorId": "a2428c9e-f849-4367-a0e9-9c9ffba45aa5",
+    "name": "My Safe Circle",
+    "status": "ACTIVE",
+    "maxMembers": 5,
+    "createdAt": "2026-08-30T02:32:55.037Z",
+    "expiresAt": "2026-08-30T03:32:55.037Z",
+    "latitude": 22.58739192428027,
+    "longitude": 88.4410910348841
+  },
+  {
+    "id": "ca18a2d8-954a-4221-95ad-d531a3838677",
+    "creatorId": "a2428c9e-f849-4367-a0e9-9c9ffba45aa5",
+    "name": "My Safe Circle2",
+    "status": "ENDED",
+    "maxMembers": 5,
+    "createdAt": "2026-08-30T02:32:59.569Z",
+    "expiresAt": "2026-08-30T03:32:59.569Z",
+    "latitude": 22.58739192428027,
+    "longitude": 88.4410910348841
+  },
+  {
+    "id": "af35d499-b8b3-4bc0-9d05-33277f4e0c93",
+    "creatorId": "a2428c9e-f849-4367-a0e9-9c9ffba45aa5",
+    "name": "My Safe Circle55",
+    "status": "ENDED",
+    "maxMembers": 5,
+    "createdAt": "2026-08-30T02:33:20.263Z",
+    "expiresAt": "2026-08-30T03:33:20.263Z",
+    "latitude": 22.58731137255878,
+    "longitude": 88.44100905615548
+  }
+]

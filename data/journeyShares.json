@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "id": "bcaef6b9-c984-4ae7-9e94-2a14d42ab668",
+    "journeyId": "762094ea-dbac-428f-b92c-aab9cfc9a18b",
+    "ownerUserId": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "trustedContactUserId": "44a2b5c4-2a6e-4cc7-b3e9-5e43694924a5",
+    "status": "EXPIRED",
+    "createdAt": "2026-08-30T02:29:59.190Z",
+    "expiresAt": "2026-08-30T02:30:02.607Z"
+  }
+]

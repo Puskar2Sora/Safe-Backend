@@ -1,1 +1,42 @@
-[]
+[
+  {
+    "id": "e4718c55-c278-48ce-803e-9a39149927ff",
+    "circleId": "4616052d-bf24-4003-80ee-d8b9bd23e7a7",
+    "userId": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "status": "ACTIVE",
+    "joinedAt": "2026-08-27T08:17:02.502Z",
+    "leftAt": null
+  },
+  {
+    "id": "7e9a6278-c964-463e-b00d-07551105bd29",
+    "circleId": "9a9a1d4a-d616-41a9-a526-4bbf46c3c5a8",
+    "userId": "2abb5388-2780-4adf-ae90-42b0c3e8a8b8",
+    "status": "ACTIVE",
+    "joinedAt": "2026-08-30T02:30:27.568Z",
+    "leftAt": null
+  },
+  {
+    "id": "880822eb-d450-4466-bbd1-74b648f7e745",
+    "circleId": "8b4ec2ae-0ca9-4f28-946b-1c34047d68d1",
+    "userId": "a2428c9e-f849-4367-a0e9-9c9ffba45aa5",
+    "status": "ACTIVE",
+    "joinedAt": "2026-08-30T02:32:55.037Z",
+    "leftAt": null
+  },
+  {
+    "id": "8bc38b0c-5bee-499e-9962-0f35a27d9b85",
+    "circleId": "ca18a2d8-954a-4221-95ad-d531a3838677",
+    "userId": "a2428c9e-f849-4367-a0e9-9c9ffba45aa5",
+    "status": "ACTIVE",
+    "joinedAt": "2026-08-30T02:32:59.569Z",
+    "leftAt": null
+  },
+  {
+    "id": "4265e57c-a1fa-42bc-ad90-39d02ff1f322",
+    "circleId": "af35d499-b8b3-4bc0-9d05-33277f4e0c93",
+    "userId": "a2428c9e-f849-4367-a0e9-9c9ffba45aa5",
+    "status": "ACTIVE",
+    "joinedAt": "2026-08-30T02:33:20.263Z",
+    "leftAt": null
+  }
+]
