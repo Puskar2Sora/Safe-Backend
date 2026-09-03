@@ -1,4 +1,5 @@
 const geocodingUrl = 'https://nominatim.openstreetmap.org/search'
+const reverseGeocodingUrl = 'https://nominatim.openstreetmap.org/reverse'
 const routingUrl = 'https://router.project-osrm.org/route/v1/driving'
 
 async function fetchWithRetry(url, options = {}) {
@@ -26,17 +27,58 @@ async function geocodeLocation(location) {
   if (!response.ok) throw new Error('Geocoding service is unavailable')
   const results = await response.json()
   if (!results.length) throw new Error(`Could not find a location for "${location}"`)
+  const [result] = results
 
   return {
-    latitude: Number(results[0].lat),
-    longitude: Number(results[0].lon),
-    displayName: results[0].display_name,
+    latitude: Number(result.lat),
+    longitude: Number(result.lon),
+    displayName: result.display_name,
   }
 }
 
+async function reverseGeocodeLocation(latitude, longitude) {
+  const response = await fetchWithRetry(`${reverseGeocodingUrl}?format=jsonv2&zoom=18&lat=${latitude}&lon=${longitude}`, {
+    headers: { 'User-Agent': "Women's Safety Platform MVP" },
+  })
+
+  if (!response.ok) throw new Error('Location lookup service is unavailable')
+  const result = await response.json()
+  if (!result.display_name) throw new Error('Could not identify your current location')
+
+  return { latitude, longitude, displayName: result.display_name }
+}
+
+// A location coming from the client can be either:
+//  - plain text the person typed and never picked a suggestion for (needs geocoding), or
+//  - an already-resolved coordinate, from clicking an autocomplete suggestion or from
+//    "use my current location" (must NOT be re-geocoded - that would throw away precision
+//    and can resolve to the wrong place for common/duplicate names).
+function isResolvedLocation(value) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    Number.isFinite(Number(value.latitude)) &&
+    Number.isFinite(Number(value.longitude))
+  )
+}
+
+async function resolveLocation(input) {
+  if (isResolvedLocation(input)) {
+    return {
+      latitude: Number(input.latitude),
+      longitude: Number(input.longitude),
+      displayName: input.displayName || input.name || `${input.latitude}, ${input.longitude}`,
+    }
+  }
+  if (typeof input === 'string' && input.trim()) {
+    return geocodeLocation(input.trim())
+  }
+  throw new Error('A location is required')
+}
+
 async function findRoute(from, to) {
-  const origin = await geocodeLocation(from)
-  const destination = await geocodeLocation(to)
+  const origin = await resolveLocation(from)
+  const destination = await resolveLocation(to)
   const longitudeDelta = destination.longitude - origin.longitude
   const latitudeDelta = destination.latitude - origin.latitude
   const midpointLongitude = (origin.longitude + destination.longitude) / 2
@@ -79,4 +121,59 @@ async function findRoute(from, to) {
   }
 }
 
-module.exports = { findRoute, geocodeLocation }
+async function searchLocations(query, userCoords = null) {
+  if (!query || typeof query !== 'string' || !query.trim()) {
+    return []
+  }
+
+  let url = `${geocodingUrl}?format=jsonv2&limit=8&addressdetails=1&q=${encodeURIComponent(query.trim())}`
+
+  if (userCoords && Number.isFinite(userCoords.latitude) && Number.isFinite(userCoords.longitude)) {
+    const lat = userCoords.latitude
+    const lon = userCoords.longitude
+    const left = lon - 1.0
+    const right = lon + 1.0
+    const top = lat + 1.0
+    const bottom = lat - 1.0
+    url += `&viewbox=${left},${top},${right},${bottom}&bounded=0`
+  }
+
+  const response = await fetchWithRetry(url, {
+    headers: { 'User-Agent': "Women's Safety Platform MVP" },
+  })
+
+  if (!response.ok) return []
+  const results = await response.json()
+  if (!Array.isArray(results)) return []
+
+  return results.map((item) => {
+    const name = item.name || item.address?.amenity || item.address?.shop || item.address?.building || item.address?.road || item.address?.suburb || item.address?.city || item.display_name.split(',')[0]
+    const fullDisplayName = item.display_name
+
+    let subtitle = ''
+    if (fullDisplayName.startsWith(name)) {
+      subtitle = fullDisplayName.slice(name.length).replace(/^[,\s]+/, '')
+    } else {
+      subtitle = [
+        item.address?.suburb || item.address?.neighbourhood,
+        item.address?.city || item.address?.town || item.address?.municipality,
+        item.address?.state,
+        item.address?.country,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    }
+
+    return {
+      placeId: item.place_id,
+      name: name || item.display_name,
+      subtitle: subtitle || item.display_name,
+      displayName: item.display_name,
+      latitude: Number(item.lat),
+      longitude: Number(item.lon),
+      type: item.type || item.category || 'location',
+    }
+  })
+}
+
+module.exports = { findRoute, geocodeLocation, reverseGeocodeLocation, searchLocations, resolveLocation }

@@ -18,5 +18,404 @@
     "description": "Khub kharap Light",
     "location": "CGHS Wellness Centre Airport Dispensary, Jessore Road, Gorabazar, Dum Dum, Kolkata Metropolitan Area, Barrackpur - II, Kolkata, West Bengal, 700052, India",
     "date": "2026-08-26T10:44:20.898Z"
+  },
+  {
+    "id": "875733c3-6cc9-4523-a278-6a65b024d882",
+    "latitude": 22.654566,
+    "longitude": 88.43935,
+    "category": "Accident Blackspot",
+    "severity": "HIGH",
+    "description": "Two-wheeler riders killed in a fatal road accident near Michael Nagar on Jessore Road; part of a spike in fatal crashes reported in this stretch.",
+    "location": "Michael Nagar, Jessore Road, Kolkata",
+    "date": "2025-03-15T09:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "0eafdfc8-1693-46e4-8aed-3d57f1396bf2",
+      "8e2d3ab8-eb1f-45c9-b75d-467c474937ec",
+      "9f05b894-0ee9-46a7-8fd8-fefac362619f",
+      "5f0fd781-0772-4897-b67c-bf3c9c3935da",
+      "0d625001-aa86-4e5e-8d08-a6f0741693cd",
+      "db4dc9d1-32c9-41ef-9336-f4657989b129"
+    ],
+    "source": "News report: Millennium Post, 'Spike in fatal accidents on Jessore Rd raises concern'"
+  },
+  {
+    "id": "6992fbd3-b897-4177-8f49-f2cfcd0214ce",
+    "latitude": 22.676075,
+    "longitude": 88.445787,
+    "category": "Accident Blackspot",
+    "severity": "HIGH",
+    "description": "Fatal road accident reported near Airport Gate No. 3 on Jessore Road, part of a cluster of two-wheeler fatalities in the area.",
+    "location": "Near Airport Gate 3, Jessore Road, Kolkata",
+    "date": "2025-03-01T18:30:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "0eafdfc8-1693-46e4-8aed-3d57f1396bf2",
+      "8e2d3ab8-eb1f-45c9-b75d-467c474937ec",
+      "9f05b894-0ee9-46a7-8fd8-fefac362619f",
+      "5f0fd781-0772-4897-b67c-bf3c9c3935da",
+      "0d625001-aa86-4e5e-8d08-a6f0741693cd",
+      "db4dc9d1-32c9-41ef-9336-f4657989b129"
+    ],
+    "source": "News report: Millennium Post, 'Spike in fatal accidents on Jessore Rd raises concern'"
+  },
+  {
+    "id": "fc120968-b611-4de3-ae8b-42aa4c12dd14",
+    "latitude": 22.683675,
+    "longitude": 88.462676,
+    "category": "Accident Blackspot",
+    "severity": "HIGH",
+    "description": "A sand-laden truck fatally struck a family of three (including a minor) on Belghoria Expressway near this stretch.",
+    "location": "Belghoria Expressway, near Jessore Road, Kolkata",
+    "date": "2025-02-18T20:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "0eafdfc8-1693-46e4-8aed-3d57f1396bf2",
+      "8e2d3ab8-eb1f-45c9-b75d-467c474937ec",
+      "9f05b894-0ee9-46a7-8fd8-fefac362619f",
+      "5f0fd781-0772-4897-b67c-bf3c9c3935da",
+      "0d625001-aa86-4e5e-8d08-a6f0741693cd",
+      "db4dc9d1-32c9-41ef-9336-f4657989b129"
+    ],
+    "source": "News report: Millennium Post"
+  },
+  {
+    "id": "4ad66f5a-3b8c-4f02-86fc-19b1fffacbbe",
+    "latitude": 22.615087,
+    "longitude": 88.411759,
+    "category": "Waterlogging",
+    "severity": "MEDIUM",
+    "description": "Heavy monsoon rainfall caused severe waterlogging on arterial roads including EM Bypass and Central Avenue during the September 2025 cloudburst, disrupting traffic across north Kolkata.",
+    "location": "Ultadanga / VIP Road corridor, Kolkata",
+    "date": "2025-09-23T02:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "0eafdfc8-1693-46e4-8aed-3d57f1396bf2",
+      "8e2d3ab8-eb1f-45c9-b75d-467c474937ec",
+      "9f05b894-0ee9-46a7-8fd8-fefac362619f",
+      "5f0fd781-0772-4897-b67c-bf3c9c3935da",
+      "0d625001-aa86-4e5e-8d08-a6f0741693cd",
+      "db4dc9d1-32c9-41ef-9336-f4657989b129"
+    ],
+    "source": "September 2025 Kolkata cloudburst (Wikipedia; local news)"
+  },
+  {
+    "id": "7c3b999a-6706-4d2f-83b6-83233e13ef5d",
+    "latitude": 22.633695,
+    "longitude": 88.423838,
+    "category": "Unsafe Road",
+    "severity": "MEDIUM",
+    "description": "Road users report rash driving and frequent lane-cutting by two-wheelers along this stretch; Kolkata traffic police data shows two-wheelers account for the largest share of rash-driving cases in the city.",
+    "location": "Nagerbazar - Lake Town stretch, Jessore Road, Kolkata",
+    "date": "2026-08-15T08:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "0eafdfc8-1693-46e4-8aed-3d57f1396bf2",
+      "8e2d3ab8-eb1f-45c9-b75d-467c474937ec",
+      "9f05b894-0ee9-46a7-8fd8-fefac362619f",
+      "5f0fd781-0772-4897-b67c-bf3c9c3935da",
+      "0d625001-aa86-4e5e-8d08-a6f0741693cd",
+      "db4dc9d1-32c9-41ef-9336-f4657989b129"
+    ],
+    "source": "Statista: 'Number of rash driving cases across Kolkata by vehicle type'"
+  },
+  {
+    "id": "ce49aa53-9f70-4421-99d2-c59b08fee579",
+    "latitude": 22.65116,
+    "longitude": 88.422496,
+    "category": "Accident Blackspot",
+    "severity": "HIGH",
+    "description": "Two-wheeler riders killed in a fatal road accident near Michael Nagar on Jessore Road; part of a spike in fatal crashes reported in this stretch.",
+    "location": "Michael Nagar, Jessore Road, Kolkata",
+    "date": "2025-03-15T09:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "0c503fd9-83ee-485f-8724-d723a45fee69"
+    ],
+    "source": "News report: Millennium Post, 'Spike in fatal accidents on Jessore Rd raises concern'"
+  },
+  {
+    "id": "6a2038ca-43f8-4431-88e7-ee52c212227b",
+    "latitude": 22.653284,
+    "longitude": 88.438266,
+    "category": "Accident Blackspot",
+    "severity": "HIGH",
+    "description": "Fatal road accident reported near Airport Gate No. 3 on Jessore Road, part of a cluster of two-wheeler fatalities in the area.",
+    "location": "Near Airport Gate 3, Jessore Road, Kolkata",
+    "date": "2025-03-01T18:30:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "0c503fd9-83ee-485f-8724-d723a45fee69"
+    ],
+    "source": "News report: Millennium Post, 'Spike in fatal accidents on Jessore Rd raises concern'"
+  },
+  {
+    "id": "a20cd4d1-8747-4079-97cf-88f9e35c0de0",
+    "latitude": 22.678398,
+    "longitude": 88.44759,
+    "category": "Accident Blackspot",
+    "severity": "HIGH",
+    "description": "A sand-laden truck fatally struck a family of three (including a minor) on Belghoria Expressway near this stretch.",
+    "location": "Belghoria Expressway, near Jessore Road, Kolkata",
+    "date": "2025-02-18T20:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "0c503fd9-83ee-485f-8724-d723a45fee69"
+    ],
+    "source": "News report: Millennium Post"
+  },
+  {
+    "id": "0825c142-1f6b-4222-92b8-61da277661f0",
+    "latitude": 22.624083,
+    "longitude": 88.416501,
+    "category": "Waterlogging",
+    "severity": "MEDIUM",
+    "description": "Heavy monsoon rainfall caused severe waterlogging on arterial roads including EM Bypass and Central Avenue during the September 2025 cloudburst, disrupting traffic across north Kolkata.",
+    "location": "Ultadanga / VIP Road corridor, Kolkata",
+    "date": "2025-09-23T02:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "0c503fd9-83ee-485f-8724-d723a45fee69"
+    ],
+    "source": "September 2025 Kolkata cloudburst (Wikipedia; local news)"
+  },
+  {
+    "id": "3500d756-cb66-4709-a09a-085bb81f55da",
+    "latitude": 22.643556,
+    "longitude": 88.422362,
+    "category": "Unsafe Road",
+    "severity": "MEDIUM",
+    "description": "Road users report rash driving and frequent lane-cutting by two-wheelers along this stretch; Kolkata traffic police data shows two-wheelers account for the largest share of rash-driving cases in the city.",
+    "location": "Nagerbazar - Lake Town stretch, Jessore Road, Kolkata",
+    "date": "2026-08-15T08:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "0c503fd9-83ee-485f-8724-d723a45fee69"
+    ],
+    "source": "Statista: 'Number of rash driving cases across Kolkata by vehicle type'"
+  },
+  {
+    "id": "b00bfef8-dd55-4989-a672-4a6d1b75b074",
+    "latitude": 22.574366,
+    "longitude": 88.328776,
+    "category": "Traffic Congestion",
+    "severity": "MEDIUM",
+    "description": "Howrah Bridge (Rabindra Setu) carries approximately 80,000 vehicles and 400,000 pedestrians daily, making it one of the most congested crossings in the city, especially during peak hours.",
+    "location": "Howrah Bridge (Rabindra Setu), Kolkata-Howrah",
+    "date": "2026-01-10T09:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "3fdd89ef-ea82-4467-96d3-27533b56131d"
+    ],
+    "source": "Deccan Herald: 'Howrah Bridge to undergo in-depth health checkup'"
+  },
+  {
+    "id": "fef1b79d-8d1a-4ca2-a895-8cc8c29253d9",
+    "latitude": 22.574585,
+    "longitude": 88.326896,
+    "category": "Unsafe Road",
+    "severity": "LOW",
+    "description": "Kolkata Port authorities scheduled a comprehensive structural health checkup of the 80-year-old Howrah Bridge in consultation with IIT Madras; routine maintenance and resurfacing work is ongoing.",
+    "location": "Howrah Bridge approach, Strand Road, Kolkata",
+    "date": "2026-01-10T09:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "3fdd89ef-ea82-4467-96d3-27533b56131d"
+    ],
+    "source": "Deccan Herald"
+  },
+  {
+    "id": "3ccfafc5-8e2f-4a56-aba3-6331bfa5c054",
+    "latitude": 22.579401,
+    "longitude": 88.331482,
+    "category": "Traffic Congestion",
+    "severity": "MEDIUM",
+    "description": "Howrah Bridge (Rabindra Setu) sees heavy daily congestion, especially for traffic entering from the Central Avenue / Dum Dum side during peak hours.",
+    "location": "Howrah Bridge approach via Central Avenue",
+    "date": "2026-01-10T09:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "b36b384a-2a0e-40c5-a3d2-20c0acc59387"
+    ],
+    "source": "Deccan Herald"
+  },
+  {
+    "id": "52d646cd-6d95-4a51-a608-c969fba6cd6b",
+    "latitude": 22.594127,
+    "longitude": 88.375447,
+    "category": "Waterlogging",
+    "severity": "MEDIUM",
+    "description": "Central Avenue was among the arterial roads that turned into rivers during the record September 2025 rainfall, with traffic crawling for hours at key intersections.",
+    "location": "Central Avenue, Kolkata",
+    "date": "2025-09-23T10:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "b36b384a-2a0e-40c5-a3d2-20c0acc59387"
+    ],
+    "source": "Tribune India: '10 dead as torrential rain paralyses Kolkata'"
+  },
+  {
+    "id": "0d808204-c5e3-4a7d-b5b1-464b72f4873c",
+    "latitude": 22.67033,
+    "longitude": 88.463252,
+    "category": "Waterlogging",
+    "severity": "MEDIUM",
+    "description": "Waterlogging is a recurring concern in Rajarhat New Town during heavy monsoon rains, especially in peripheral sub-sectors with inconsistent storm drainage.",
+    "location": "Rajarhat New Town, Kolkata",
+    "date": "2026-07-10T14:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "cc25e348-6ab4-445a-8757-18bc7be4d5cd"
+    ],
+    "source": "SquareYards locality reviews, Rajarhat New Town"
+  },
+  {
+    "id": "c592951f-3e25-4e7e-9fbf-cc62be388144",
+    "latitude": 22.657777,
+    "longitude": 88.465947,
+    "category": "Unsafe Road",
+    "severity": "LOW",
+    "description": "Poor road maintenance reported in peripheral sub-sectors of New Town away from the main IT-hub arterial roads.",
+    "location": "New Town peripheral sectors, Rajarhat",
+    "date": "2026-06-01T11:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "cc25e348-6ab4-445a-8757-18bc7be4d5cd"
+    ],
+    "source": "SquareYards locality reviews, Rajarhat New Town"
+  },
+  {
+    "id": "782ff1d3-389d-4cf1-8806-77d63a47ae4e",
+    "latitude": 22.595934,
+    "longitude": 88.407304,
+    "category": "Waterlogging",
+    "severity": "MEDIUM",
+    "description": "Waterlogging is a recurring concern in Rajarhat New Town during heavy monsoon rains, especially in peripheral sub-sectors with inconsistent storm drainage.",
+    "location": "Rajarhat New Town, Kolkata",
+    "date": "2026-07-10T14:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "2de288cb-3d37-4610-b297-1b5fc4445b28"
+    ],
+    "source": "SquareYards locality reviews, Rajarhat New Town"
+  },
+  {
+    "id": "aebcf149-bb3b-407a-8bf2-6f9e6b0488e2",
+    "latitude": 22.600739,
+    "longitude": 88.40813,
+    "category": "Unsafe Road",
+    "severity": "LOW",
+    "description": "Poor road maintenance reported in peripheral sub-sectors of New Town away from the main IT-hub arterial roads.",
+    "location": "New Town peripheral sectors, Rajarhat",
+    "date": "2026-06-01T11:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "2de288cb-3d37-4610-b297-1b5fc4445b28"
+    ],
+    "source": "SquareYards locality reviews, Rajarhat New Town"
+  },
+  {
+    "id": "d954cd88-f812-4d38-8ab7-3c3508964ffa",
+    "latitude": 22.580048,
+    "longitude": 88.390626,
+    "category": "Waterlogging",
+    "severity": "HIGH",
+    "description": "EM Bypass and nearby low-lying stretches near Topsia/Tangra experienced severe waterlogging during the record September 2025 cloudburst, disrupting traffic for hours.",
+    "location": "EM Bypass near Topsia/Tangra, Kolkata",
+    "date": "2025-09-23T11:00:00.000Z",
+    "verified": true,
+    "journeyIds": [
+      "674bad6c-f6a4-491b-b20c-35ef5839de5f",
+      "9802ae24-65b7-490f-af1c-e7f2970cbb61",
+      "c1521e5c-4001-4140-b06e-0a69e6ecb16f"
+    ],
+    "source": "Wikipedia: 'September 2025 Kolkata cloudburst'; Tribune India"
+  },
+  {
+    "id": "944e89c0-4bc3-477d-a417-e18c1fad7f15",
+    "latitude": 22.660835,
+    "longitude": 88.46401,
+    "category": "Isolated / Deserted Stretch",
+    "severity": "HIGH",
+    "womenSafetyRelevant": true,
+    "description": "An academic study on women's safety in Kolkata documented a resident describing Rajarhat as empty and frightening around 7:30-8pm, with no pedestrians, unresponsive autos, and no one to call for help.",
+    "location": "Rajarhat / New Town, Kolkata",
+    "date": "2022-08-01T19:30:00.000Z",
+    "verified": true,
+    "source": "Tandfonline: 'Visibility matters: Constructing safe passages on the streets of Kolkata' (2022)",
+    "journeyIds": [
+      "cc25e348-6ab4-445a-8757-18bc7be4d5cd"
+    ]
+  },
+  {
+    "id": "2f9fc688-2b8f-4586-8622-4be0eefc10e2",
+    "latitude": 22.596891,
+    "longitude": 88.40176,
+    "category": "Isolated / Deserted Stretch",
+    "severity": "HIGH",
+    "womenSafetyRelevant": true,
+    "description": "Same study documents that high-income, low-footfall neighbourhoods around Rajarhat/New Town were perceived as especially unsafe for women due to poor visual connectivity and limited public transport.",
+    "location": "Rajarhat / New Town, Kolkata",
+    "date": "2022-08-01T19:30:00.000Z",
+    "verified": true,
+    "source": "Tandfonline: 'Visibility matters: Constructing safe passages on the streets of Kolkata' (2022)",
+    "journeyIds": [
+      "2de288cb-3d37-4610-b297-1b5fc4445b28"
+    ]
+  },
+  {
+    "id": "d8e6197a-4f25-4ddc-b23d-dab984228a04",
+    "latitude": 22.628459,
+    "longitude": 88.420281,
+    "category": "Harassment Reported",
+    "severity": "MEDIUM",
+    "womenSafetyRelevant": true,
+    "description": "Women surveyed across Kolkata reported frequent street harassment, inadequate lighting, and slow police responsiveness at night, per a citywide comparison of NCRB crime data and NCW survey findings.",
+    "location": "Kolkata (city-wide corridor)",
+    "date": "2025-10-06T00:00:00.000Z",
+    "verified": true,
+    "source": "The Logical Indian: 'NCRB Vs NCW: Kolkata Named Safest and Least Safe for Women' (Oct 2025)",
+    "journeyIds": [
+      "0eafdfc8-1693-46e4-8aed-3d57f1396bf2",
+      "8e2d3ab8-eb1f-45c9-b75d-467c474937ec",
+      "9f05b894-0ee9-46a7-8fd8-fefac362619f",
+      "5f0fd781-0772-4897-b67c-bf3c9c3935da",
+      "0d625001-aa86-4e5e-8d08-a6f0741693cd",
+      "db4dc9d1-32c9-41ef-9336-f4657989b129"
+    ]
+  },
+  {
+    "id": "1f09bc5f-e169-4a80-816c-c855e6cec15a",
+    "latitude": 22.64093,
+    "longitude": 88.430136,
+    "category": "Harassment Reported",
+    "severity": "MEDIUM",
+    "womenSafetyRelevant": true,
+    "description": "Women surveyed across Kolkata reported frequent street harassment, inadequate lighting, and slow police responsiveness at night, per a citywide comparison of NCRB crime data and NCW survey findings.",
+    "location": "Kolkata (city-wide corridor)",
+    "date": "2025-10-06T00:00:00.000Z",
+    "verified": true,
+    "source": "The Logical Indian: 'NCRB Vs NCW: Kolkata Named Safest and Least Safe for Women' (Oct 2025)",
+    "journeyIds": [
+      "0c503fd9-83ee-485f-8724-d723a45fee69"
+    ]
+  },
+  {
+    "id": "e8adbe85-b500-4756-b3c7-6770961b4404",
+    "latitude": 22.571875,
+    "longitude": 88.389438,
+    "category": "Poor Lighting",
+    "severity": "MEDIUM",
+    "womenSafetyRelevant": true,
+    "description": "Residents describe many stretches on the city's industrial periphery as poorly lit with limited streetlight maintenance funding, a pattern documented across Indian metros as a top women's-safety concern.",
+    "location": "Tangra industrial periphery, Kolkata",
+    "date": "2025-03-24T00:00:00.000Z",
+    "verified": true,
+    "source": "Deccan Herald: 'NGO shines light on women's safety; calls for well-lit streets' (Mar 2025)",
+    "journeyIds": [
+      "674bad6c-f6a4-491b-b20c-35ef5839de5f",
+      "9802ae24-65b7-490f-af1c-e7f2970cbb61",
+      "c1521e5c-4001-4140-b06e-0a69e6ecb16f"
+    ]
   }
 ]
