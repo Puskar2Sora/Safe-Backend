@@ -10,6 +10,7 @@ function readContacts() {
   return JSON.parse(fs.readFileSync(contactsFile, 'utf8'))
 }
 
+
 function saveContacts(contacts) {
   fs.writeFileSync(contactsFile, `${JSON.stringify(contacts, null, 2)}\n`)
 }

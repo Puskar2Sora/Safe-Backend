@@ -34,6 +34,8 @@ router.post('/register', (req, res) => {
     email: normalizedEmail,
     password: password.trim(),
     phone: phone.trim(),
+    isWomanVerified: false,
+    verificationDetails: null,
   }
 
   users.push(user)
@@ -42,7 +44,13 @@ router.post('/register', (req, res) => {
   return res.status(201).json({
     success: true,
     message: 'Registration successful',
-    user: { id: user.id, name: user.name, email: user.email, phone: user.phone },
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      isWomanVerified: user.isWomanVerified,
+    },
   })
 })
 
@@ -62,7 +70,59 @@ router.post('/login', (req, res) => {
 
   return res.json({
     success: true,
-    user: { id: user.id, name: user.name, email: user.email },
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      isWomanVerified: Boolean(user.isWomanVerified),
+    },
+  })
+})
+
+// Verification Endpoint
+router.post('/verify-gender', (req, res) => {
+  const { userId, faceVerified, voicePitch } = req.body
+
+  if (!userId || typeof faceVerified !== 'boolean' || typeof voicePitch !== 'number') {
+    return res.status(400).json({ success: false, message: 'Missing or invalid verification data' })
+  }
+
+  if (!faceVerified) {
+    return res.status(400).json({ success: false, message: 'Facial liveness verification failed' })
+  }
+
+  // Frequency threshold check (e.g. >= 160 Hz)
+  if (voicePitch < 160) {
+    return res.status(400).json({ success: false, message: 'Voice pitch analysis did not meet verification criteria' })
+  }
+
+  const users = readUsers()
+  const userIndex = users.findIndex((u) => u.id === userId)
+
+  if (userIndex === -1) {
+    return res.status(404).json({ success: false, message: 'User not found' })
+  }
+
+  users[userIndex].isWomanVerified = true
+  users[userIndex].verificationDetails = {
+    voicePitch,
+    faceVerified,
+    verifiedAt: new Date().toISOString(),
+  }
+
+  saveUsers(users)
+
+  const updatedUser = users[userIndex]
+
+  return res.json({
+    success: true,
+    message: 'Verification successful',
+    user: {
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      isWomanVerified: updatedUser.isWomanVerified,
+    },
   })
 })
 

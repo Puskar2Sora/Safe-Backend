@@ -417,5 +417,98 @@
       "9802ae24-65b7-490f-af1c-e7f2970cbb61",
       "c1521e5c-4001-4140-b06e-0a69e6ecb16f"
     ]
+  },
+  {
+    "id": "fb73264e-dc06-49ee-a812-aa949e6f7606",
+    "latitude": 22.5735,
+    "longitude": 88.3427,
+    "category": "Unsafe Pedestrian Crossing",
+    "severity": "HIGH",
+    "womenSafetyRelevant": true,
+    "description": "Commuters report an unsafe, unsignaled pedestrian crossing on the Kolkata-side approach to Howrah Bridge, where fast-moving mixed traffic makes crossing on foot risky, especially after dark.",
+    "location": "Howrah Bridge, Kolkata-side approach",
+    "date": "2026-08-21T17:00:00.000Z",
+    "verified": false,
+    "journeyIds": [
+      "3fdd89ef-ea82-4467-96d3-27533b56131d"
+    ]
+  },
+  {
+    "id": "751fecaa-fd82-40b1-98b0-0a0e82466a8f",
+    "latitude": 22.612,
+    "longitude": 88.393,
+    "category": "Pothole",
+    "severity": "LOW",
+    "description": "Unverified user report of potholes near the Belgachia underpass on the Dum Dum to Howrah corridor, more pronounced after monsoon rains.",
+    "location": "Belgachia underpass, Kolkata",
+    "date": "2026-08-17T07:30:00.000Z",
+    "verified": false,
+    "journeyIds": [
+      "b36b384a-2a0e-40c5-a3d2-20c0acc59387"
+    ]
+  },
+  {
+    "id": "f67c579a-2b3d-4125-8f58-41c4516c82c0",
+    "latitude": 22.61,
+    "longitude": 88.395,
+    "category": "Isolated / Deserted Stretch",
+    "severity": "HIGH",
+    "womenSafetyRelevant": true,
+    "description": "Multiple commuters have flagged the Belgachia stretch of this route as feeling unsafe after dark due to poor lighting and low pedestrian footfall, particularly for women travelling alone.",
+    "location": "Belgachia, Kolkata",
+    "date": "2026-08-19T20:45:00.000Z",
+    "verified": false,
+    "journeyIds": [
+      "b36b384a-2a0e-40c5-a3d2-20c0acc59387"
+    ]
+  },
+  {
+    "id": "e1913193-be03-4a46-aad0-3654e9af495d",
+    "latitude": 22.565,
+    "longitude": 88.393,
+    "category": "Unsafe Road",
+    "severity": "LOW",
+    "description": "User-reported heavy, unregulated truck traffic near Tangra's tannery cluster creating hazards for two-wheelers and pedestrians.",
+    "location": "Tangra industrial stretch, Kolkata",
+    "date": "2026-08-25T09:00:00.000Z",
+    "verified": false,
+    "journeyIds": [
+      "674bad6c-f6a4-491b-b20c-35ef5839de5f",
+      "9802ae24-65b7-490f-af1c-e7f2970cbb61",
+      "c1521e5c-4001-4140-b06e-0a69e6ecb16f"
+    ]
+  },
+  {
+    "id": "5de56191-dc64-4c6a-9ab1-333d60f4627c",
+    "latitude": 22.705,
+    "longitude": 88.478,
+    "category": "Poor Lighting",
+    "severity": "LOW",
+    "description": "Commuter-reported patchy street lighting after dusk near Madhyamgram, making the roadside harder to see for pedestrians and two-wheelers.",
+    "location": "Madhyamgram, Jessore Road",
+    "date": "2026-08-20T19:15:00.000Z",
+    "verified": false,
+    "journeyIds": [
+      "0eafdfc8-1693-46e4-8aed-3d57f1396bf2",
+      "8e2d3ab8-eb1f-45c9-b75d-467c474937ec",
+      "9f05b894-0ee9-46a7-8fd8-fefac362619f",
+      "5f0fd781-0772-4897-b67c-bf3c9c3935da",
+      "0d625001-aa86-4e5e-8d08-a6f0741693cd",
+      "db4dc9d1-32c9-41ef-9336-f4657989b129"
+    ]
+  },
+  {
+    "id": "ec11834d-c3a0-4a79-bb50-6673075f3400",
+    "latitude": 22.708,
+    "longitude": 88.48,
+    "category": "Poor Lighting",
+    "severity": "LOW",
+    "description": "Commuter-reported patchy street lighting after dusk near Madhyamgram, making the roadside harder to see for pedestrians and two-wheelers.",
+    "location": "Madhyamgram, Jessore Road",
+    "date": "2026-08-20T19:15:00.000Z",
+    "verified": false,
+    "journeyIds": [
+      "0c503fd9-83ee-485f-8724-d723a45fee69"
+    ]
   }
 ]
