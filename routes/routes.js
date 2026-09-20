@@ -23,14 +23,19 @@ router.get('/search', async (req, res) => {
     // typing "Barasat" should show "Barasat" itself before "Barasat Road, ..." or
     // unrelated places that merely mention it in the address.
     const normalizedQuery = query.trim().toLowerCase()
-    const rank = (item) => {
+    const matchRank = (item) => {
       const name = (item.name || '').toLowerCase()
       if (name === normalizedQuery) return 0
       if (name.startsWith(normalizedQuery)) return 1
       if (name.includes(normalizedQuery)) return 2
       return 3
     }
-    const rankedSuggestions = [...suggestions].sort((a, b) => rank(a) - rank(b))
+    const rankedSuggestions = [...suggestions].sort((a, b) => {
+      const distanceA = typeof a.distanceKm === 'number' ? a.distanceKm : Number.POSITIVE_INFINITY
+      const distanceB = typeof b.distanceKm === 'number' ? b.distanceKm : Number.POSITIVE_INFINITY
+      if (distanceA !== distanceB) return distanceA - distanceB
+      return matchRank(a) - matchRank(b)
+    })
 
     return res.json({ success: true, suggestions: rankedSuggestions })
   } catch (error) {

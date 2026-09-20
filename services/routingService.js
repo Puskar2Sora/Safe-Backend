@@ -126,7 +126,7 @@ async function searchLocations(query, userCoords = null) {
     return []
   }
 
-  let url = `${geocodingUrl}?format=jsonv2&limit=8&addressdetails=1&q=${encodeURIComponent(query.trim())}`
+  let url = `${geocodingUrl}?format=jsonv2&limit=12&addressdetails=1&countrycodes=in&q=${encodeURIComponent(query.trim())}`
 
   if (userCoords && Number.isFinite(userCoords.latitude) && Number.isFinite(userCoords.longitude)) {
     const lat = userCoords.latitude
@@ -143,7 +143,24 @@ async function searchLocations(query, userCoords = null) {
   })
 
   if (!response.ok) return []
-  const results = await response.json()
+  let results = await response.json()
+  if (!Array.isArray(results)) return []
+
+  // Nominatim often needs the country in the query to resolve partial Indian
+  // place names, even when countrycodes=in is already supplied.
+  if (results.length === 0 && !query.trim().toLowerCase().endsWith('india')) {
+    let fallbackUrl = `${geocodingUrl}?format=jsonv2&limit=12&addressdetails=1&countrycodes=in&q=${encodeURIComponent(`${query.trim()}, India`)}`
+    if (userCoords && Number.isFinite(userCoords.latitude) && Number.isFinite(userCoords.longitude)) {
+      const lat = userCoords.latitude
+      const lon = userCoords.longitude
+      fallbackUrl += `&viewbox=${lon - 1},${lat + 1},${lon + 1},${lat - 1}&bounded=0`
+    }
+    const fallbackResponse = await fetchWithRetry(fallbackUrl, {
+      headers: { 'User-Agent': "Women's Safety Platform MVP" },
+    })
+    if (fallbackResponse.ok) results = await fallbackResponse.json()
+  }
+
   if (!Array.isArray(results)) return []
 
   return results.map((item) => {
@@ -164,14 +181,21 @@ async function searchLocations(query, userCoords = null) {
         .join(', ')
     }
 
+    const latitude = Number(item.lat)
+    const longitude = Number(item.lon)
+    const distanceKm = userCoords
+      ? Math.sqrt(Math.pow((latitude - userCoords.latitude) * 111, 2) + Math.pow((longitude - userCoords.longitude) * 111 * Math.cos(userCoords.latitude * Math.PI / 180), 2))
+      : null
+
     return {
       placeId: item.place_id,
       name: name || item.display_name,
       subtitle: subtitle || item.display_name,
       displayName: item.display_name,
-      latitude: Number(item.lat),
-      longitude: Number(item.lon),
+      latitude,
+      longitude,
       type: item.type || item.category || 'location',
+      distanceKm,
     }
   })
 }

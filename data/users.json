@@ -19,5 +19,18 @@
     "email": "puskar1@gmail.com",
     "password": "916345",
     "phone": "1234567896"
+  },
+  {
+    "id": "d7209989-bf3c-417d-a918-26009f222321",
+    "name": "Tuhina Banerjee",
+    "email": "tuhinabanerjee134@gmail.com",
+    "password": "123456",
+    "phone": "8981218381",
+    "isWomanVerified": true,
+    "verificationDetails": {
+      "voicePitch": 298,
+      "faceVerified": true,
+      "verifiedAt": "2026-09-14T17:44:47.222Z"
+    }
   }
 ]

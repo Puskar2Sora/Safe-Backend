@@ -38,5 +38,13 @@
     "status": "ACTIVE",
     "joinedAt": "2026-08-30T02:33:20.263Z",
     "leftAt": null
+  },
+  {
+    "id": "b5e9ed47-a96d-4a90-9eba-ab014843362d",
+    "circleId": "a873103c-c7d3-4595-8cbc-ab1b7b30ee98",
+    "userId": "d7209989-bf3c-417d-a918-26009f222321",
+    "status": "ACTIVE",
+    "joinedAt": "2026-09-20T17:36:46.406Z",
+    "leftAt": null
   }
 ]
