@@ -1,5 +1,5 @@
 require('dotenv').config()
-
+const { connectToDatabase } = require('./config/db')
 const express = require('express')
 const cors = require('cors')
 const http = require('http')
@@ -181,7 +181,14 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', (reason) => console.log(`Socket disconnected: ${socket.id} (${reason})`))
 })
+async function start() {
+  await connectToDatabase()
+  httpServer.listen(port, () => {
+    console.log(`Women's Safety API listening on port ${port}`)
+  })
+}
 
-httpServer.listen(port, () => {
-  console.log(`Women's Safety API listening on port ${port}`)
+start().catch((error) => {
+  console.error('Failed to start server:', error)
+  process.exit(1)
 })

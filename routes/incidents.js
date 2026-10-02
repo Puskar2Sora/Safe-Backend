@@ -1,20 +1,14 @@
 const crypto = require('crypto')
 const express = require('express')
-const fs = require('fs')
-const path = require('path')
+const { getDb } = require('../config/db')
 const { geocodeLocation } = require('../services/routingService')
 
 const router = express.Router()
-const incidentsFile = path.join(__dirname, '..', 'data', 'incidents.json')
 const categories = ['Harassment', 'Stalking', 'Theft', 'Suspicious Activity', 'Assault', 'Unsafe Road', 'Poor Lighting', 'Other']
 const severities = ['LOW', 'MODERATE', 'HIGH', 'CRITICAL']
 
-function readIncidents() {
-  return JSON.parse(fs.readFileSync(incidentsFile, 'utf8'))
-}
-
-function saveIncidents(incidents) {
-  fs.writeFileSync(incidentsFile, `${JSON.stringify(incidents, null, 2)}\n`)
+function incidentsCollection() {
+  return getDb().collection('incidents')
 }
 
 router.post('/', async (req, res) => {
@@ -39,15 +33,26 @@ router.post('/', async (req, res) => {
       location: coordinates.displayName,
       date: new Date().toISOString(),
     }
-    const incidents = readIncidents()
-    incidents.push(incident)
-    saveIncidents(incidents)
-    return res.status(201).json({ success: true, incident })
+
+    await incidentsCollection().insertOne(incident)
+    // insertOne mutates `incident` in place, adding Mongo's own _id - strip it
+    // before responding so API consumers see the exact same shape as before.
+    const { _id, ...incidentResponse } = incident
+    return res.status(201).json({ success: true, incident: incidentResponse })
   } catch (error) {
     return res.status(502).json({ success: false, message: error instanceof Error ? error.message : 'Unable to locate the incident' })
   }
 })
 
-router.get('/', (req, res) => res.json({ success: true, incidents: readIncidents() }))
+router.get('/', async (req, res) => {
+  try {
+    // Exclude Mongo's _id from the response - nothing downstream expects it,
+    // and this keeps the payload identical to what the old file-based version sent.
+    const incidents = await incidentsCollection().find({}, { projection: { _id: 0 } }).toArray()
+    return res.json({ success: true, incidents })
+  } catch (error) {
+    return res.status(502).json({ success: false, message: 'Unable to load incidents' })
+  }
+})
 
 module.exports = router
