@@ -19,7 +19,8 @@ function contactsCollection() {
 }
 
 router.post('/', async (req, res) => {
-  const { userId, origin, destination, selectedRoute, startTime, status = 'ACTIVE', riskScore } = req.body
+  const { origin, destination, selectedRoute, startTime, status = 'ACTIVE', riskScore } = req.body
+  const userId = req.user.id
 
   if (!userId || !origin || !destination || !selectedRoute || !startTime || riskScore === undefined) {
     return res.status(400).json({ success: false, message: 'User, origin, destination, selected route, start time, and risk score are required' })
@@ -34,7 +35,16 @@ router.post('/', async (req, res) => {
   return res.status(201).json({ success: true, journey: journeyResponse })
 })
 
+router.get('/', async (req, res) => {
+  const journeys = await journeysCollection()
+    .find({ userId: req.user.id }, { projection: { _id: 0 } })
+    .sort({ startTime: -1 })
+    .toArray()
+  return res.json({ success: true, journeys })
+})
+
 router.get('/:userId/active/:journeyId', async (req, res) => {
+  if (req.params.userId !== req.user.id) return res.status(403).json({ success: false, message: 'You are not authorized to access this journey' })
   const journey = await journeysCollection().findOne(
     { userId: req.params.userId, id: req.params.journeyId, status: 'ACTIVE' },
     { projection: { _id: 0 } },
@@ -43,7 +53,8 @@ router.get('/:userId/active/:journeyId', async (req, res) => {
 })
 
 router.post('/:journeyId/share', async (req, res) => {
-  const { ownerUserId, trustedContactUserIds, expiresAt } = req.body
+  const { trustedContactUserIds, expiresAt } = req.body
+  const ownerUserId = req.user.id
   const journey = await journeysCollection().findOne({ id: req.params.journeyId, userId: ownerUserId, status: 'ACTIVE' })
   if (!journey) return res.status(403).json({ success: false, message: 'Only the active journey owner can share this journey' })
   if (!Array.isArray(trustedContactUserIds) || trustedContactUserIds.length === 0) {
@@ -77,7 +88,7 @@ router.post('/:journeyId/share', async (req, res) => {
 })
 
 router.get('/:journeyId/shares', async (req, res) => {
-  const requesterUserId = req.query.userId
+  const requesterUserId = req.user.id
   const journey = await journeysCollection().findOne({ id: req.params.journeyId }, { projection: { _id: 0 } })
   const shares = await sharesCollection()
     .find({ journeyId: req.params.journeyId, status: 'ACTIVE' }, { projection: { _id: 0 } })
@@ -90,7 +101,7 @@ router.get('/:journeyId/shares', async (req, res) => {
 })
 
 router.delete('/:journeyId/share/:shareId', async (req, res) => {
-  const { ownerUserId } = req.body
+  const ownerUserId = req.user.id
   const journey = await journeysCollection().findOne({ id: req.params.journeyId, userId: ownerUserId })
   if (!journey) return res.status(403).json({ success: false, message: 'Only the journey owner can revoke sharing' })
 
@@ -104,7 +115,7 @@ router.delete('/:journeyId/share/:shareId', async (req, res) => {
 })
 
 router.get('/:journeyId/monitor', async (req, res) => {
-  const requesterUserId = req.query.userId
+  const requesterUserId = req.user.id
   const journey = await journeysCollection().findOne({ id: req.params.journeyId, status: 'ACTIVE' }, { projection: { _id: 0 } })
   const share = await sharesCollection().findOne(
     { journeyId: req.params.journeyId, trustedContactUserId: requesterUserId, status: 'ACTIVE' },
@@ -115,12 +126,13 @@ router.get('/:journeyId/monitor', async (req, res) => {
 })
 
 router.get('/:userId/active', async (req, res) => {
+  if (req.params.userId !== req.user.id) return res.status(403).json({ success: false, message: 'You are not authorized to access this journey' })
   const journey = await journeysCollection().findOne({ userId: req.params.userId, status: 'ACTIVE' }, { projection: { _id: 0 } })
   return res.json({ success: true, journey: journey || null })
 })
 
 router.patch('/:id/stop', async (req, res) => {
-  const journey = await journeysCollection().findOne({ id: req.params.id })
+  const journey = await journeysCollection().findOne({ id: req.params.id, userId: req.user.id })
   if (!journey) return res.status(404).json({ success: false, message: 'Journey not found' })
 
   await journeysCollection().updateOne({ id: journey.id }, { $set: { status: 'COMPLETED' } })

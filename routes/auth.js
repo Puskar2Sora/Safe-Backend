@@ -1,30 +1,55 @@
 const crypto = require('crypto')
 const express = require('express')
-const fs = require('fs')
-const path = require('path')
+const { getDb } = require('../config/db')
+const { authenticate } = require('../middleware/auth')
 
 const router = express.Router()
-const usersFile = path.join(__dirname, '..', 'data', 'users.json')
+const sessionDurationMs = 7 * 24 * 60 * 60 * 1000
 
-function readUsers() {
-  return JSON.parse(fs.readFileSync(usersFile, 'utf8'))
+function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+  const passwordHash = crypto.scryptSync(password, salt, 64).toString('hex')
+  return `${salt}:${passwordHash}`
 }
 
-function saveUsers(users) {
-  fs.writeFileSync(usersFile, `${JSON.stringify(users, null, 2)}\n`)
+function verifyPassword(password, storedHash) {
+  const [salt, expectedHash] = String(storedHash || '').split(':')
+  if (!salt || !expectedHash) return false
+  const actualHash = crypto.scryptSync(password, salt, 64).toString('hex')
+  return crypto.timingSafeEqual(Buffer.from(actualHash, 'hex'), Buffer.from(expectedHash, 'hex'))
 }
 
-router.post('/register', (req, res) => {
+function publicUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    isWomanVerified: Boolean(user.isWomanVerified),
+  }
+}
+
+async function createSession(userId) {
+  const token = crypto.randomBytes(32).toString('base64url')
+  await getDb().collection('sessions').insertOne({
+    userId,
+    tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
+    createdAt: new Date(),
+    lastUsedAt: new Date(),
+    expiresAt: new Date(Date.now() + sessionDurationMs),
+  })
+  return token
+}
+
+router.post('/register', async (req, res) => {
   const { name, email, password, phone } = req.body
-
   if (![name, email, password, phone].every((value) => typeof value === 'string' && value.trim())) {
     return res.status(400).json({ success: false, message: 'Name, email, password, and phone are required' })
   }
+  if (password.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' })
 
+  const users = getDb().collection('users')
   const normalizedEmail = email.trim().toLowerCase()
-  const users = readUsers()
-
-  if (users.some((user) => user.email === normalizedEmail)) {
+  if (await users.findOne({ email: normalizedEmail })) {
     return res.status(409).json({ success: false, message: 'An account with this email already exists' })
   }
 
@@ -32,98 +57,55 @@ router.post('/register', (req, res) => {
     id: crypto.randomUUID(),
     name: name.trim(),
     email: normalizedEmail,
-    password: password.trim(),
+    passwordHash: hashPassword(password),
     phone: phone.trim(),
     isWomanVerified: false,
     verificationDetails: null,
+    createdAt: new Date(),
   }
-
-  users.push(user)
-  saveUsers(users)
-
-  return res.status(201).json({
-    success: true,
-    message: 'Registration successful',
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      isWomanVerified: user.isWomanVerified,
-    },
-  })
+  await users.insertOne(user)
+  return res.status(201).json({ success: true, message: 'Registration successful', user: publicUser(user) })
 })
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const { email, password } = req.body
-
   if (![email, password].every((value) => typeof value === 'string' && value.trim())) {
     return res.status(400).json({ success: false, message: 'Email and password are required' })
   }
 
-  const normalizedEmail = email.trim().toLowerCase()
-  const user = readUsers().find((candidate) => candidate.email === normalizedEmail && candidate.password === password)
-
-  if (!user) {
+  const user = await getDb().collection('users').findOne({ email: email.trim().toLowerCase() })
+  const validPassword = user && (verifyPassword(password, user.passwordHash) || user.password === password)
+  if (!user || !validPassword) {
     return res.status(401).json({ success: false, message: 'Invalid email or password' })
   }
-
-  return res.json({
-    success: true,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      isWomanVerified: Boolean(user.isWomanVerified),
-    },
-  })
+  if (!user.passwordHash) {
+    await getDb().collection('users').updateOne({ _id: user._id }, { $set: { passwordHash: hashPassword(password) }, $unset: { password: '' } })
+  }
+  const token = await createSession(user.id)
+  return res.json({ success: true, token, user: publicUser(user) })
 })
 
-// Verification Endpoint
-router.post('/verify-gender', (req, res) => {
-  const { userId, faceVerified, voicePitch } = req.body
+router.post('/logout', authenticate, async (req, res) => {
+  await getDb().collection('sessions').deleteOne({ _id: req.session._id })
+  return res.json({ success: true })
+})
 
-  if (!userId || typeof faceVerified !== 'boolean' || typeof voicePitch !== 'number') {
+router.get('/me', authenticate, (req, res) => res.json({ success: true, user: req.user }))
+
+router.post('/verify-gender', authenticate, async (req, res) => {
+  const { faceVerified, voicePitch } = req.body
+  if (typeof faceVerified !== 'boolean' || typeof voicePitch !== 'number' || !Number.isFinite(voicePitch)) {
     return res.status(400).json({ success: false, message: 'Missing or invalid verification data' })
   }
+  if (!faceVerified) return res.status(400).json({ success: false, message: 'Facial liveness verification failed' })
+  if (voicePitch < 160) return res.status(400).json({ success: false, message: 'Voice pitch analysis did not meet verification criteria' })
 
-  if (!faceVerified) {
-    return res.status(400).json({ success: false, message: 'Facial liveness verification failed' })
-  }
-
-  // Frequency threshold check (e.g. >= 160 Hz)
-  if (voicePitch < 160) {
-    return res.status(400).json({ success: false, message: 'Voice pitch analysis did not meet verification criteria' })
-  }
-
-  const users = readUsers()
-  const userIndex = users.findIndex((u) => u.id === userId)
-
-  if (userIndex === -1) {
-    return res.status(404).json({ success: false, message: 'User not found' })
-  }
-
-  users[userIndex].isWomanVerified = true
-  users[userIndex].verificationDetails = {
-    voicePitch,
-    faceVerified,
-    verifiedAt: new Date().toISOString(),
-  }
-
-  saveUsers(users)
-
-  const updatedUser = users[userIndex]
-
-  return res.json({
-    success: true,
-    message: 'Verification successful',
-    user: {
-      id: updatedUser.id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      isWomanVerified: updatedUser.isWomanVerified,
-    },
-  })
+  await getDb().collection('users').updateOne(
+    { id: req.user.id },
+    { $set: { isWomanVerified: true, verificationDetails: { voicePitch, faceVerified, verifiedAt: new Date() } } },
+  )
+  const user = await getDb().collection('users').findOne({ id: req.user.id }, { projection: { _id: 0, passwordHash: 0, password: 0 } })
+  return res.json({ success: true, message: 'Verification successful', user })
 })
 
 module.exports = router

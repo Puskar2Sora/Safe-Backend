@@ -1,38 +1,31 @@
 const crypto = require('crypto')
 const express = require('express')
-const fs = require('fs')
-const path = require('path')
+const { getDb } = require('../config/db')
 
 const router = express.Router()
-const emergenciesFile = path.join(__dirname, '..', 'data', 'emergencies.json')
 
-function readEmergencies() {
-  return JSON.parse(fs.readFileSync(emergenciesFile, 'utf8'))
-}
-
-function saveEmergencies(emergencies) {
-  fs.writeFileSync(emergenciesFile, `${JSON.stringify(emergencies, null, 2)}\n`)
-}
-
-router.post('/', (req, res) => {
-  const { userId, latitude, longitude } = req.body
-
-  if (!userId || typeof latitude !== 'number' || typeof longitude !== 'number') {
-    return res.status(400).json({ success: false, message: 'User ID and current location are required' })
+router.post('/', async (req, res) => {
+  const { latitude, longitude } = req.body
+  if (typeof latitude !== 'number' || typeof longitude !== 'number' || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ success: false, message: 'Valid current coordinates are required' })
   }
 
   const emergency = {
     id: crypto.randomUUID(),
-    userId,
+    userId: req.user.id,
     latitude,
     longitude,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(),
     status: 'ACTIVE',
   }
-  const emergencies = readEmergencies()
-  emergencies.push(emergency)
-  saveEmergencies(emergencies)
-  return res.status(201).json({ success: true, message: 'Emergency activated.', emergency })
+  await getDb().collection('emergencies').insertOne(emergency)
+  const { _id, ...responseEmergency } = emergency
+  return res.status(201).json({ success: true, message: 'Emergency activated.', emergency: responseEmergency })
+})
+
+router.get('/', async (req, res) => {
+  const emergencies = await getDb().collection('emergencies').find({ userId: req.user.id }, { projection: { _id: 0 } }).sort({ timestamp: -1 }).toArray()
+  return res.json({ success: true, emergencies })
 })
 
 module.exports = router

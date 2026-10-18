@@ -1,11 +1,12 @@
 // Run with: node scripts/importData.js  (from the backend/ folder)
 //
-// Reads every *.json file in backend/data/ and loads it into an Atlas collection
+// Development migration only: reads every *.json file in backend/data/ and loads it into an Atlas collection
 // of the same name (incidents.json -> "incidents" collection, journeys.json ->
 // "journeys" collection, and so on). Safe to re-run: each collection is cleared
 // right before its file's contents are inserted, so running this twice doesn't
 // create duplicates - it just re-syncs Atlas to whatever is currently in your
-// local JSON files.
+// local JSON files. Runtime routes do not read these files; they use MongoDB
+// exclusively.
 
 require('dotenv').config()
 

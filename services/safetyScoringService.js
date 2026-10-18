@@ -1,13 +1,6 @@
-const fs = require('fs')
-const path = require('path')
-
-const incidentsFile = path.join(__dirname, '..', 'data', 'incidents.json')
+const { getDb } = require('../config/db')
 const proximityThresholdMeters = 1000
 const severityWeights = { low: 10, moderate: 25, high: 45, critical: 70 }
-
-function readIncidents() {
-  return JSON.parse(fs.readFileSync(incidentsFile, 'utf8'))
-}
 
 function distanceBetween(latitude1, longitude1, latitude2, longitude2) {
   const earthRadius = 6371000
@@ -53,8 +46,9 @@ function scoreRoute(route, incidents) {
   }
 }
 
-function scoreRoutes(routes) {
-  return routes.map((route) => scoreRoute(route, readIncidents()))
+async function scoreRoutes(routes) {
+  const incidents = await getDb().collection('incidents').find({}, { projection: { _id: 0 } }).toArray()
+  return routes.map((route) => scoreRoute(route, incidents))
 }
 
 module.exports = { scoreRoutes }

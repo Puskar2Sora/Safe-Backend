@@ -1,56 +1,36 @@
 const crypto = require('crypto')
 const express = require('express')
-const fs = require('fs')
-const path = require('path')
+const { getDb } = require('../config/db')
 
 const router = express.Router()
-const contactsFile = path.join(__dirname, '..', 'data', 'contacts.json')
+const contacts = () => getDb().collection('contacts')
 
-function readContacts() {
-  return JSON.parse(fs.readFileSync(contactsFile, 'utf8'))
-}
-
-
-function saveContacts(contacts) {
-  fs.writeFileSync(contactsFile, `${JSON.stringify(contacts, null, 2)}\n`)
-}
-
-router.post('/', (req, res) => {
-  const { userId, name, phone, relationship } = req.body
-
-  if (![userId, name, phone, relationship].every((value) => typeof value === 'string' && value.trim())) {
-    return res.status(400).json({ success: false, message: 'User ID, name, phone, and relationship are required' })
+router.post('/', async (req, res) => {
+  const { name, phone, relationship } = req.body
+  if (![name, phone, relationship].every((value) => typeof value === 'string' && value.trim())) {
+    return res.status(400).json({ success: false, message: 'Name, phone, and relationship are required' })
   }
-
-  const contacts = readContacts()
   const contact = {
     id: crypto.randomUUID(),
-    userId: userId.trim(),
+    userId: req.user.id,
     name: name.trim(),
     phone: phone.trim(),
     relationship: relationship.trim(),
+    createdAt: new Date(),
   }
-
-  contacts.push(contact)
-  saveContacts(contacts)
-
-  return res.status(201).json({ success: true, contact })
+  await contacts().insertOne(contact)
+  const { _id, ...responseContact } = contact
+  return res.status(201).json({ success: true, contact: responseContact })
 })
 
-router.get('/:userId', (req, res) => {
-  const contacts = readContacts().filter((contact) => contact.userId === req.params.userId)
-  return res.json({ success: true, contacts })
+router.get('/:userId', async (req, res) => {
+  const results = await contacts().find({ userId: req.user.id }, { projection: { _id: 0 } }).toArray()
+  return res.json({ success: true, contacts: results })
 })
 
-router.delete('/:id', (req, res) => {
-  const contacts = readContacts()
-  const remainingContacts = contacts.filter((contact) => contact.id !== req.params.id)
-
-  if (remainingContacts.length === contacts.length) {
-    return res.status(404).json({ success: false, message: 'Contact not found' })
-  }
-
-  saveContacts(remainingContacts)
+router.delete('/:id', async (req, res) => {
+  const result = await contacts().deleteOne({ id: req.params.id, userId: req.user.id })
+  if (!result.deletedCount) return res.status(404).json({ success: false, message: 'Contact not found' })
   return res.json({ success: true, message: 'Contact deleted' })
 })
 

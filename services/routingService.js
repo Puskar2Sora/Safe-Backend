@@ -1,6 +1,8 @@
 const geocodingUrl = 'https://nominatim.openstreetmap.org/search'
 const reverseGeocodingUrl = 'https://nominatim.openstreetmap.org/reverse'
 const routingUrl = 'https://router.project-osrm.org/route/v1/driving'
+const mapboxRoutingUrl = 'https://api.mapbox.com/directions/v5/mapbox/driving-traffic'
+const trafficLevels = ['LOW', 'MODERATE', 'HIGH', 'SEVERE']
 
 async function fetchWithRetry(url, options = {}) {
   let lastError
@@ -76,9 +78,70 @@ async function resolveLocation(input) {
   throw new Error('A location is required')
 }
 
+function trafficLevelFromCongestion(congestion) {
+  if (congestion === 'severe') return 'SEVERE'
+  if (congestion === 'heavy') return 'HIGH'
+  if (congestion === 'moderate') return 'MODERATE'
+  return 'LOW'
+}
+
+function estimateTrafficLevel(date = new Date(), segmentIndex = 0) {
+  const hour = date.getHours()
+  const isPeak = (hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 21)
+  if (isPeak) return segmentIndex % 5 === 0 ? 'SEVERE' : segmentIndex % 2 === 0 ? 'HIGH' : 'MODERATE'
+  if (hour >= 11 && hour <= 16) return segmentIndex % 4 === 0 ? 'HIGH' : 'MODERATE'
+  return segmentIndex % 3 === 0 ? 'MODERATE' : 'LOW'
+}
+
+function buildTrafficSegments(coordinates, congestion = [], source = 'estimated') {
+  return coordinates.slice(0, -1).map((start, index) => ({
+    coordinates: [start, coordinates[index + 1]],
+    trafficLevel: source === 'mapbox' ? trafficLevelFromCongestion(congestion[index]) : estimateTrafficLevel(new Date(), index),
+  }))
+}
+
+function enrichRoute(route, index, source = 'estimated') {
+  const coordinates = route.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude])
+  const congestion = route.legs?.flatMap((leg) => leg.annotation?.congestion || []) || []
+  const annotatedDuration = route.legs?.flatMap((leg) => leg.annotation?.duration || []).reduce((sum, value) => sum + Number(value || 0), 0) || 0
+  const trafficSegments = buildTrafficSegments(coordinates, congestion, source)
+  const baseDuration = Number(route.duration)
+  const trafficDuration = source === 'mapbox' && annotatedDuration > 0 ? annotatedDuration : Number(route.durationTypical || route.duration)
+  return {
+    routeId: `route-${index + 1}`,
+    coordinates,
+    distance: route.distance,
+    duration: baseDuration,
+    trafficDuration,
+    trafficDelaySeconds: Math.max(0, Math.round(trafficDuration - baseDuration)),
+    trafficLevel: trafficSegments.reduce((highest, segment) => Math.max(highest, trafficLevels.indexOf(segment.trafficLevel)), 0) >= 3
+      ? 'SEVERE'
+      : trafficSegments.reduce((highest, segment) => Math.max(highest, trafficLevels.indexOf(segment.trafficLevel)), 0) >= 2
+        ? 'HIGH'
+        : trafficSegments.some((segment) => segment.trafficLevel === 'MODERATE') ? 'MODERATE' : 'LOW',
+    trafficScore: Math.round(trafficSegments.reduce((sum, segment) => sum + trafficLevels.indexOf(segment.trafficLevel) * 33.33, 0) / Math.max(1, trafficSegments.length)),
+    trafficSource: source,
+    trafficSegments,
+  }
+}
+
+async function findMapboxRoute(origin, destination) {
+  const points = `${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}`
+  const url = `${mapboxRoutingUrl}/${points}?alternatives=true&overview=full&geometries=geojson&annotations=congestion,duration&access_token=${encodeURIComponent(process.env.MAPBOX_ACCESS_TOKEN)}`
+  const response = await fetchWithRetry(url)
+  if (!response.ok) throw new Error('Mapbox traffic routing service is unavailable')
+  const result = await response.json()
+  return result.routes?.map((route, index) => enrichRoute(route, index, 'mapbox')) || []
+}
+
 async function findRoute(from, to) {
   const origin = await resolveLocation(from)
   const destination = await resolveLocation(to)
+  if (process.env.MAPBOX_ACCESS_TOKEN) {
+    const routes = await findMapboxRoute(origin, destination)
+    if (!routes.length) throw new Error('No traffic-aware route was found between these locations')
+    return { origin, destination, routes }
+  }
   const longitudeDelta = destination.longitude - origin.longitude
   const latitudeDelta = destination.latitude - origin.latitude
   const midpointLongitude = (origin.longitude + destination.longitude) / 2
@@ -112,12 +175,7 @@ async function findRoute(from, to) {
   return {
     origin,
     destination,
-    routes: routes.map((route, index) => ({
-      routeId: `route-${index + 1}`,
-      coordinates: route.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude]),
-      distance: route.distance,
-      duration: route.duration,
-    })),
+    routes: routes.map((route, index) => enrichRoute(route, index)),
   }
 }
 
@@ -200,4 +258,4 @@ async function searchLocations(query, userCoords = null) {
   })
 }
 
-module.exports = { findRoute, geocodeLocation, reverseGeocodeLocation, searchLocations, resolveLocation }
+module.exports = { findRoute, geocodeLocation, reverseGeocodeLocation, searchLocations, resolveLocation, buildTrafficSegments, estimateTrafficLevel }

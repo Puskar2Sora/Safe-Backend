@@ -28,4 +28,9 @@ function getDb() {
   return db
 }
 
-module.exports = { connectToDatabase, getDb }
+async function closeDatabase() {
+  await client.close()
+  db = undefined
+}
+
+module.exports = { connectToDatabase, getDb, closeDatabase }

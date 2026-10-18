@@ -3,9 +3,8 @@ const { connectToDatabase } = require('./config/db')
 const express = require('express')
 const cors = require('cors')
 const http = require('http')
-const fs = require('fs')
-const path = require('path')
 const { Server } = require('socket.io')
+const { getDb } = require('./config/db')
 const healthRoutes = require('./routes/health')
 const authRoutes = require('./routes/auth')
 const contactsRoutes = require('./routes/contacts')
@@ -14,71 +13,62 @@ const incidentsRoutes = require('./routes/incidents')
 const journeysRoutes = require('./routes/journeys')
 const emergenciesRoutes = require('./routes/emergencies')
 const safeCirclesRoutes = require('./routes/safeCircles')
+const { authenticate, getUserFromToken } = require('./middleware/auth')
 
 const app = express()
 const port = process.env.PORT || 5000
 const frontendOrigin = process.env.FRONTEND_URL || 'http://localhost:5173'
-const usersFile = path.join(__dirname, 'data', 'users.json')
-const journeysFile = path.join(__dirname, 'data', 'journeys.json')
-const sharesFile = path.join(__dirname, 'data', 'journeyShares.json')
-const contactsFile = path.join(__dirname, 'data', 'contacts.json')
-
-function readJson(file) {
-  return JSON.parse(fs.readFileSync(file, 'utf8'))
+async function findActiveJourney(journeyId, userId) {
+  return getDb().collection('journeys').findOne({ id: journeyId, userId, status: 'ACTIVE' })
 }
 
-function findUser(userId) {
-  return readJson(usersFile).find((user) => user.id === userId)
+async function hasActiveShare(journeyId, userId) {
+  return getDb().collection('journeyShares').findOne({ journeyId, trustedContactUserId: userId, status: 'ACTIVE' })
 }
 
-function isKnownSocketIdentity(userId) {
-  return Boolean(findUser(userId) || readJson(contactsFile).some((contact) => contact.id === userId))
-}
-
-function findActiveJourney(journeyId, userId) {
-  return readJson(journeysFile).find((journey) => journey.id === journeyId && journey.userId === userId && journey.status === 'ACTIVE')
-}
-
-function hasActiveShare(journeyId, userId) {
-  return readJson(sharesFile).some((share) => share.journeyId === journeyId && share.trustedContactUserId === userId && share.status === 'ACTIVE')
-}
-
-function findActiveCircle(circleId) {
-  return readJson(path.join(__dirname, 'data', 'safeCircles.json')).find((circle) => circle.id === circleId && circle.status === 'ACTIVE' && new Date(circle.expiresAt).getTime() > Date.now())
+async function findActiveCircle(circleId) {
+  return getDb().collection('safeCircles').findOne({ id: circleId, status: 'ACTIVE', expiresAt: { $gt: new Date() } })
 }
 
 app.use(cors())
 app.use(express.json())
 app.use('/api', healthRoutes)
 app.use('/api/auth', authRoutes)
-app.use('/api/contacts', contactsRoutes)
-app.use('/api/routes', routesRoutes)
-app.use('/api/incidents', incidentsRoutes)
-app.use('/api/journeys', journeysRoutes)
-app.use('/api/emergencies', emergenciesRoutes)
-app.use('/api/safe-circles', safeCirclesRoutes)
+app.use('/api/contacts', authenticate, contactsRoutes)
+app.use('/api/routes', authenticate, routesRoutes)
+app.use('/api/incidents', authenticate, incidentsRoutes)
+app.use('/api/journeys', authenticate, journeysRoutes)
+app.use('/api/emergencies', authenticate, emergenciesRoutes)
+app.use('/api/safe-circles', authenticate, safeCirclesRoutes)
 
 const httpServer = http.createServer(app)
 const io = new Server(httpServer, {
   cors: { origin: frontendOrigin, methods: ['GET', 'POST'] },
 })
 app.set('io', io)
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token
+    const authenticated = await getUserFromToken(token)
+    if (!authenticated) return next(new Error('Authentication is required'))
+    socket.data.user = authenticated.user
+    socket.data.userId = authenticated.user.id
+    return next()
+  } catch (error) {
+    return next(error)
+  }
+})
 
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`)
 
-  socket.on('identify_user', ({ userId } = {}) => {
-    if (typeof userId === 'string' && userId.trim() && isKnownSocketIdentity(userId.trim())) {
-      socket.data.userId = userId.trim()
-      console.log(`Socket identified: ${socket.id} (${socket.data.userId})`)
-    } else {
-      socket.emit('journey_error', { message: 'User could not be identified' })
-    }
+  socket.on('identify_user', () => {
+    console.log(`Socket identified: ${socket.id} (${socket.data.userId})`)
   })
 
-  socket.on('join_journey', ({ journeyId } = {}) => {
+  socket.on('join_journey', async ({ journeyId } = {}) => {
     if (typeof journeyId !== 'string' || !journeyId.trim()) return
-    if (!socket.data.userId || !findActiveJourney(journeyId.trim(), socket.data.userId)) {
+    if (!socket.data.userId || !(await findActiveJourney(journeyId.trim(), socket.data.userId))) {
       socket.emit('journey_error', { message: 'You are not authorized to join this journey' })
       return
     }
@@ -90,8 +80,8 @@ io.on('connection', (socket) => {
     socket.to(room).emit('user_connected', { journeyId: journeyId.trim(), userId: socket.data.userId, connectedUsers })
   })
 
-  socket.on('join_monitoring', ({ journeyId } = {}) => {
-    if (typeof journeyId !== 'string' || !journeyId.trim() || !socket.data.userId || !hasActiveShare(journeyId.trim(), socket.data.userId)) {
+  socket.on('join_monitoring', async ({ journeyId } = {}) => {
+    if (typeof journeyId !== 'string' || !journeyId.trim() || !socket.data.userId || !(await hasActiveShare(journeyId.trim(), socket.data.userId))) {
       socket.emit('journey_error', { message: 'You are not authorized to monitor this journey' })
       return
     }
@@ -104,9 +94,9 @@ io.on('connection', (socket) => {
     socket.to(room).emit('user_connected', { journeyId: journeyId.trim(), userId: socket.data.userId, connectedUsers })
   })
 
-  socket.on('location_update', ({ journeyId, userId, latitude, longitude, accuracy, timestamp } = {}) => {
+  socket.on('location_update', async ({ journeyId, userId, latitude, longitude, accuracy, timestamp } = {}) => {
     const coordinatesAreValid = typeof latitude === 'number' && typeof longitude === 'number' && Number.isFinite(latitude) && Number.isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180
-    if (!coordinatesAreValid || typeof journeyId !== 'string' || typeof userId !== 'string' || userId !== socket.data.userId || !findUser(userId) || !findActiveJourney(journeyId, userId) || !socket.rooms.has(`journey:${journeyId}`)) {
+    if (!coordinatesAreValid || typeof journeyId !== 'string' || typeof userId !== 'string' || userId !== socket.data.userId || !(await findActiveJourney(journeyId, userId)) || !socket.rooms.has(`journey:${journeyId}`)) {
       socket.emit('journey_error', { message: 'Location update was not authorized' })
       return
     }
@@ -115,10 +105,10 @@ io.on('connection', (socket) => {
     socket.emit('location_updated', location)
   })
 
-  socket.on('join_circle', ({ circleId } = {}) => {
-    const circle = findActiveCircle(circleId)
-    const members = readJson(path.join(__dirname, 'data', 'safeCircleMembers.json'))
-    if (!socket.data.userId || !circle || !members.some((member) => member.circleId === circleId && member.userId === socket.data.userId && member.status === 'ACTIVE')) {
+  socket.on('join_circle', async ({ circleId } = {}) => {
+    const circle = await findActiveCircle(circleId)
+    const member = await getDb().collection('safeCircleMembers').findOne({ circleId, userId: socket.data.userId, status: 'ACTIVE' })
+    if (!socket.data.userId || !circle || !member) {
       socket.emit('circle_error', { message: 'You are not an active member of this circle' })
       return
     }
@@ -128,10 +118,10 @@ io.on('connection', (socket) => {
     socket.emit('circle_joined', { circleId, room })
   })
 
-  socket.on('circle_location_update', ({ circleId, userId, latitude, longitude, accuracy, timestamp } = {}) => {
-    const members = readJson(path.join(__dirname, 'data', 'safeCircleMembers.json'))
+  socket.on('circle_location_update', async ({ circleId, userId, latitude, longitude, accuracy, timestamp } = {}) => {
+    const member = await getDb().collection('safeCircleMembers').findOne({ circleId, userId, status: 'ACTIVE' })
     const validCoordinates = [latitude, longitude].every((value) => typeof value === 'number' && Number.isFinite(value)) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180
-    if (!validCoordinates || userId !== socket.data.userId || !members.some((member) => member.circleId === circleId && member.userId === userId && member.status === 'ACTIVE') || !socket.rooms.has(`circle:${circleId}`)) {
+    if (!validCoordinates || userId !== socket.data.userId || !member || !socket.rooms.has(`circle:${circleId}`)) {
       socket.emit('circle_error', { message: 'Circle location update was not authorized' })
       return
     }
@@ -144,9 +134,9 @@ io.on('connection', (socket) => {
     socket.data.circleRoom = undefined
   })
 
-  socket.on('circle_member_joined', ({ circleId, userId } = {}) => {
-    const members = readJson(path.join(__dirname, 'data', 'safeCircleMembers.json'))
-    if (circleId && userId === socket.data.userId && members.some((member) => member.circleId === circleId && member.userId === userId && member.status === 'ACTIVE') && socket.rooms.has(`circle:${circleId}`)) {
+  socket.on('circle_member_joined', async ({ circleId, userId } = {}) => {
+    const member = await getDb().collection('safeCircleMembers').findOne({ circleId, userId, status: 'ACTIVE' })
+    if (circleId && userId === socket.data.userId && member && socket.rooms.has(`circle:${circleId}`)) {
       socket.to(`circle:${circleId}`).emit('circle_member_joined', { circleId, userId })
     }
   })
@@ -155,12 +145,10 @@ io.on('connection', (socket) => {
     if (circleId && userId === socket.data.userId) socket.to(`circle:${circleId}`).emit('circle_member_left', { circleId, userId })
   })
 
-  socket.on('end_circle', ({ circleId } = {}) => {
-    const circles = readJson(path.join(__dirname, 'data', 'safeCircles.json'))
-    const circle = circles.find((candidate) => candidate.id === circleId && candidate.creatorId === socket.data.userId && candidate.status === 'ACTIVE')
+  socket.on('end_circle', async ({ circleId } = {}) => {
+    const circle = await getDb().collection('safeCircles').findOne({ id: circleId, creatorId: socket.data.userId, status: 'ACTIVE' })
     if (!circle) return socket.emit('circle_error', { message: 'Only the circle creator can end this circle' })
-    circle.status = 'ENDED'
-    fs.writeFileSync(path.join(__dirname, 'data', 'safeCircles.json'), `${JSON.stringify(circles, null, 2)}\n`)
+    await getDb().collection('safeCircles').updateOne({ _id: circle._id }, { $set: { status: 'ENDED' } })
     io.to(`circle:${circleId}`).emit('circle_ended', { circleId })
   })
 
@@ -188,7 +176,11 @@ async function start() {
   })
 }
 
-start().catch((error) => {
-  console.error('Failed to start server:', error)
-  process.exit(1)
-})
+if (require.main === module) {
+  start().catch((error) => {
+    console.error('Failed to start server:', error)
+    process.exit(1)
+  })
+}
+
+module.exports = { app, httpServer, io, start }

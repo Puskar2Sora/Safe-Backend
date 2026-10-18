@@ -83,7 +83,7 @@ router.post('/', async (req, res) => {
 
   try {
     const route = await findRoute(from, to)
-    const scoredRoutes = scoreRoutes(route.routes)
+    const scoredRoutes = await scoreRoutes(route.routes)
     const recommendedRoute = scoredRoutes.reduce((safest, candidate) => candidate.riskScore < safest.riskScore ? candidate : safest)
     return res.json({
       success: true,
