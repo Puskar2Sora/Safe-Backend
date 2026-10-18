@@ -23,7 +23,13 @@ async function findActiveJourney(journeyId, userId) {
 }
 
 async function hasActiveShare(journeyId, userId) {
-  return getDb().collection('journeyShares').findOne({ journeyId, trustedContactUserId: userId, status: 'ACTIVE' })
+  return getDb().collection('journeyShares').findOne({
+    journeyId,
+    trustedContactUserId: userId,
+    status: 'ACTIVE',
+    permissions: { $in: ['LOCATION'] },
+    $or: [{ expiresAt: null }, { expiresAt: { $exists: false } }, { expiresAt: { $gt: new Date().toISOString() } }],
+  })
 }
 
 async function findActiveCircle(circleId) {

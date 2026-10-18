@@ -2,6 +2,7 @@ const geocodingUrl = 'https://nominatim.openstreetmap.org/search'
 const reverseGeocodingUrl = 'https://nominatim.openstreetmap.org/reverse'
 const routingUrl = 'https://router.project-osrm.org/route/v1/driving'
 const mapboxRoutingUrl = 'https://api.mapbox.com/directions/v5/mapbox/driving-traffic'
+const googleRoutesUrl = 'https://routes.googleapis.com/directions/v2:computeRoutes'
 const trafficLevels = ['LOW', 'MODERATE', 'HIGH', 'SEVERE']
 
 async function fetchWithRetry(url, options = {}) {
@@ -79,10 +80,12 @@ async function resolveLocation(input) {
 }
 
 function trafficLevelFromCongestion(congestion) {
-  if (congestion === 'severe') return 'SEVERE'
-  if (congestion === 'heavy') return 'HIGH'
-  if (congestion === 'moderate') return 'MODERATE'
-  return 'LOW'
+  const normalized = typeof congestion === 'string' ? congestion.toLowerCase() : ''
+  if (normalized === 'severe') return 'SEVERE'
+  if (normalized === 'heavy') return 'HIGH'
+  if (normalized === 'moderate') return 'MODERATE'
+  if (normalized === 'low') return 'LOW'
+  return null
 }
 
 function estimateTrafficLevel(date = new Date(), segmentIndex = 0) {
@@ -94,9 +97,12 @@ function estimateTrafficLevel(date = new Date(), segmentIndex = 0) {
 }
 
 function buildTrafficSegments(coordinates, congestion = [], source = 'estimated') {
+  const usableCongestion = congestion.filter((value) => trafficLevelFromCongestion(value))
   return coordinates.slice(0, -1).map((start, index) => ({
     coordinates: [start, coordinates[index + 1]],
-    trafficLevel: source === 'mapbox' ? trafficLevelFromCongestion(congestion[index]) : estimateTrafficLevel(new Date(), index),
+    trafficLevel: source === 'mapbox' && usableCongestion.length > 0
+      ? trafficLevelFromCongestion(usableCongestion[Math.min(usableCongestion.length - 1, Math.floor(index * usableCongestion.length / Math.max(1, coordinates.length - 1)))]) || estimateTrafficLevel(new Date(), index)
+      : estimateTrafficLevel(new Date(), index),
   }))
 }
 
@@ -106,7 +112,12 @@ function enrichRoute(route, index, source = 'estimated') {
   const annotatedDuration = route.legs?.flatMap((leg) => leg.annotation?.duration || []).reduce((sum, value) => sum + Number(value || 0), 0) || 0
   const trafficSegments = buildTrafficSegments(coordinates, congestion, source)
   const baseDuration = Number(route.duration)
-  const trafficDuration = source === 'mapbox' && annotatedDuration > 0 ? annotatedDuration : Number(route.durationTypical || route.duration)
+  const trafficScore = Math.round(trafficSegments.reduce((sum, segment) => sum + trafficLevels.indexOf(segment.trafficLevel) * 33.33, 0) / Math.max(1, trafficSegments.length))
+  const typicalDuration = Number(route.durationTypical || route.duration_typical || route.duration)
+  const trafficDuration = source === 'mapbox' && annotatedDuration > 0
+    ? annotatedDuration
+    : Math.round(typicalDuration * (1 + trafficScore / 100 * 0.35))
+  const highestTrafficIndex = trafficSegments.reduce((highest, segment) => Math.max(highest, trafficLevels.indexOf(segment.trafficLevel)), 0)
   return {
     routeId: `route-${index + 1}`,
     coordinates,
@@ -114,15 +125,123 @@ function enrichRoute(route, index, source = 'estimated') {
     duration: baseDuration,
     trafficDuration,
     trafficDelaySeconds: Math.max(0, Math.round(trafficDuration - baseDuration)),
-    trafficLevel: trafficSegments.reduce((highest, segment) => Math.max(highest, trafficLevels.indexOf(segment.trafficLevel)), 0) >= 3
+    trafficLevel: highestTrafficIndex >= 3
       ? 'SEVERE'
-      : trafficSegments.reduce((highest, segment) => Math.max(highest, trafficLevels.indexOf(segment.trafficLevel)), 0) >= 2
+      : highestTrafficIndex >= 2
         ? 'HIGH'
         : trafficSegments.some((segment) => segment.trafficLevel === 'MODERATE') ? 'MODERATE' : 'LOW',
-    trafficScore: Math.round(trafficSegments.reduce((sum, segment) => sum + trafficLevels.indexOf(segment.trafficLevel) * 33.33, 0) / Math.max(1, trafficSegments.length)),
+    trafficScore,
     trafficSource: source,
+    trafficProvider: source === 'mapbox' ? 'Mapbox' : 'Estimated',
     trafficSegments,
   }
+}
+
+function decodeGooglePolyline(encoded) {
+  const coordinates = []
+  let index = 0
+  let latitude = 0
+  let longitude = 0
+  while (index < encoded.length) {
+    let result = 0
+    let shift = 0
+    let byte
+    do {
+      byte = encoded.charCodeAt(index++) - 63
+      result |= (byte & 0x1f) << shift
+      shift += 5
+    } while (byte >= 0x20)
+    latitude += (result & 1) ? ~(result >> 1) : result >> 1
+    result = 0
+    shift = 0
+    do {
+      byte = encoded.charCodeAt(index++) - 63
+      result |= (byte & 0x1f) << shift
+      shift += 5
+    } while (byte >= 0x20)
+    longitude += (result & 1) ? ~(result >> 1) : result >> 1
+    coordinates.push([latitude / 1e5, longitude / 1e5])
+  }
+  return coordinates
+}
+
+function parseDuration(value) {
+  const match = typeof value === 'string' ? value.match(/^([\d.]+)s$/) : null
+  return match ? Number(match[1]) : Number(value) || 0
+}
+
+function googleTrafficLevel(speed) {
+  if (speed === 'TRAFFIC_JAM') return 'SEVERE'
+  if (speed === 'SLOW') return 'MODERATE'
+  return 'LOW'
+}
+
+function buildGoogleTrafficSegments(coordinates, route) {
+  const details = route.travelAdvisory?.speedReadingIntervals
+    || route.polyline?.trafficSpeedCategories
+    || []
+  if (!Array.isArray(details) || details.length === 0) return buildTrafficSegments(coordinates, [], 'estimated')
+  if (typeof details[0] === 'string') {
+    return coordinates.slice(0, -1).map((start, index) => ({
+      coordinates: [start, coordinates[index + 1]],
+      trafficLevel: googleTrafficLevel(details[Math.min(details.length - 1, Math.floor(index * details.length / Math.max(1, coordinates.length - 1)))])
+    }))
+  }
+  return details.flatMap((detail) => {
+    const start = Number(detail.startPolylinePointIndex)
+    const end = Number(detail.endPolylinePointIndex)
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end >= coordinates.length || end <= start) return []
+    return [{
+      coordinates: coordinates.slice(start, end + 1),
+      trafficLevel: googleTrafficLevel(detail.speed),
+    }]
+  })
+}
+
+function enrichGoogleRoute(route, index) {
+  const coordinates = decodeGooglePolyline(route.polyline?.encodedPolyline || '')
+  const trafficSegments = buildGoogleTrafficSegments(coordinates, route)
+  const trafficDuration = parseDuration(route.duration)
+  const baseDuration = parseDuration(route.staticDuration) || trafficDuration
+  const trafficScore = Math.round(trafficSegments.reduce((sum, segment) => sum + trafficLevels.indexOf(segment.trafficLevel) * 33.33, 0) / Math.max(1, trafficSegments.length))
+  const highestTrafficIndex = trafficSegments.reduce((highest, segment) => Math.max(highest, trafficLevels.indexOf(segment.trafficLevel)), 0)
+  return {
+    routeId: `route-${index + 1}`,
+    coordinates,
+    distance: Number(route.distanceMeters) || 0,
+    duration: baseDuration,
+    trafficDuration,
+    trafficDelaySeconds: Math.max(0, Math.round(trafficDuration - baseDuration)),
+    trafficLevel: highestTrafficIndex >= 3 ? 'SEVERE' : highestTrafficIndex >= 2 ? 'HIGH' : trafficSegments.some((segment) => segment.trafficLevel === 'MODERATE') ? 'MODERATE' : 'LOW',
+    trafficScore,
+    trafficSource: 'google',
+    trafficProvider: 'Google Routes API',
+    trafficSegments,
+  }
+}
+
+async function findGoogleRoute(origin, destination) {
+  const response = await fetchWithRetry(googleRoutesUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': process.env.GOOGLE_MAPS_API_KEY,
+      'X-Goog-FieldMask': 'routes.duration,routes.staticDuration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.travelAdvisory.speedReadingIntervals',
+    },
+    body: JSON.stringify({
+      origin: { location: { latLng: { latitude: origin.latitude, longitude: origin.longitude } } },
+      destination: { location: { latLng: { latitude: destination.latitude, longitude: destination.longitude } } },
+      travelMode: 'DRIVE',
+      routingPreference: 'TRAFFIC_AWARE',
+      computeAlternativeRoutes: true,
+      polylineQuality: 'HIGH',
+      polylineEncoding: 'ENCODED_POLYLINE',
+      extraComputations: ['TRAFFIC_ON_POLYLINE'],
+    }),
+  })
+  if (!response.ok) throw new Error('Google Routes traffic service is unavailable')
+  const result = await response.json()
+  return result.routes?.map((route, index) => enrichGoogleRoute(route, index)) || []
 }
 
 async function findMapboxRoute(origin, destination) {
@@ -137,6 +256,11 @@ async function findMapboxRoute(origin, destination) {
 async function findRoute(from, to) {
   const origin = await resolveLocation(from)
   const destination = await resolveLocation(to)
+  if (process.env.GOOGLE_MAPS_API_KEY) {
+    const routes = await findGoogleRoute(origin, destination)
+    if (!routes.length) throw new Error('No Google traffic-aware route was found between these locations')
+    return { origin, destination, routes }
+  }
   if (process.env.MAPBOX_ACCESS_TOKEN) {
     const routes = await findMapboxRoute(origin, destination)
     if (!routes.length) throw new Error('No traffic-aware route was found between these locations')
@@ -258,4 +382,4 @@ async function searchLocations(query, userCoords = null) {
   })
 }
 
-module.exports = { findRoute, geocodeLocation, reverseGeocodeLocation, searchLocations, resolveLocation, buildTrafficSegments, estimateTrafficLevel }
+module.exports = { findRoute, geocodeLocation, reverseGeocodeLocation, searchLocations, resolveLocation, buildTrafficSegments, estimateTrafficLevel, decodeGooglePolyline, buildGoogleTrafficSegments }
