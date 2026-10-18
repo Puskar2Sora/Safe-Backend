@@ -2,9 +2,18 @@ const crypto = require('crypto')
 const express = require('express')
 const { getDb } = require('../config/db')
 const { authenticate } = require('../middleware/auth')
+const multer = require('multer')
+const { v2: cloudinary } = require('cloudinary')
 
 const router = express.Router()
 const sessionDurationMs = 7 * 24 * 60 * 60 * 1000
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } })
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   const passwordHash = crypto.scryptSync(password, salt, 64).toString('hex')
@@ -25,6 +34,8 @@ function publicUser(user) {
     email: user.email,
     phone: user.phone,
     isWomanVerified: Boolean(user.isWomanVerified),
+    profileImageUrl: user.profileImageUrl || null,
+    createdAt: user.createdAt,
   }
 }
 
@@ -91,6 +102,38 @@ router.post('/logout', authenticate, async (req, res) => {
 })
 
 router.get('/me', authenticate, (req, res) => res.json({ success: true, user: req.user }))
+
+router.patch('/profile', authenticate, async (req, res) => {
+  const updates = {}
+  if (typeof req.body.name === 'string' && req.body.name.trim()) updates.name = req.body.name.trim()
+  if (typeof req.body.phone === 'string' && req.body.phone.trim()) updates.phone = req.body.phone.trim()
+  if (!Object.keys(updates).length) return res.status(400).json({ success: false, message: 'A valid name or phone number is required' })
+
+  await getDb().collection('users').updateOne({ id: req.user.id }, { $set: updates })
+  const user = await getDb().collection('users').findOne({ id: req.user.id }, { projection: { _id: 0, passwordHash: 0, password: 0 } })
+  return res.json({ success: true, user })
+})
+
+router.post('/profile/avatar', authenticate, upload.single('avatar'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: 'An image file is required' })
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(req.file.mimetype)) {
+    return res.status(400).json({ success: false, message: 'Only JPG, PNG, and WebP images are supported' })
+  }
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    return res.status(503).json({ success: false, message: 'Cloudinary is not configured on the server' })
+  }
+
+  const result = await new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'womens-safety/profile-avatars', public_id: req.user.id, overwrite: true, resource_type: 'image' },
+      (error, uploadResult) => error ? reject(error) : resolve(uploadResult),
+    )
+    stream.end(req.file.buffer)
+  })
+  await getDb().collection('users').updateOne({ id: req.user.id }, { $set: { profileImageUrl: result.secure_url, profileImagePublicId: result.public_id } })
+  const user = await getDb().collection('users').findOne({ id: req.user.id }, { projection: { _id: 0, passwordHash: 0, password: 0 } })
+  return res.json({ success: true, user })
+})
 
 router.post('/verify-gender', authenticate, async (req, res) => {
   const { faceVerified, voicePitch } = req.body
