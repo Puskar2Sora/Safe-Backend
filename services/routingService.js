@@ -5,6 +5,12 @@ const mapboxRoutingUrl = 'https://api.mapbox.com/directions/v5/mapbox/driving-tr
 const googleRoutesUrl = 'https://routes.googleapis.com/directions/v2:computeRoutes'
 const trafficLevels = ['LOW', 'MODERATE', 'HIGH', 'SEVERE']
 
+function hasUsableApiKey(value) {
+  if (typeof value !== 'string' || !value.trim()) return false
+  const normalized = value.trim().toLowerCase()
+  return !['your_google_api_key', 'your_mapbox_access_token', 'your_api_key', 'change_me'].includes(normalized)
+}
+
 async function fetchWithRetry(url, options = {}) {
   let lastError
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -256,15 +262,17 @@ async function findMapboxRoute(origin, destination) {
 async function findRoute(from, to) {
   const origin = await resolveLocation(from)
   const destination = await resolveLocation(to)
-  if (process.env.GOOGLE_MAPS_API_KEY) {
-    const routes = await findGoogleRoute(origin, destination)
-    if (!routes.length) throw new Error('No Google traffic-aware route was found between these locations')
-    return { origin, destination, routes }
+  if (hasUsableApiKey(process.env.GOOGLE_MAPS_API_KEY)) {
+    try {
+      const routes = await findGoogleRoute(origin, destination)
+      if (routes.length) return { origin, destination, routes }
+    } catch (error) {
+      if (!hasUsableApiKey(process.env.MAPBOX_ACCESS_TOKEN)) throw error
+    }
   }
-  if (process.env.MAPBOX_ACCESS_TOKEN) {
+  if (hasUsableApiKey(process.env.MAPBOX_ACCESS_TOKEN)) {
     const routes = await findMapboxRoute(origin, destination)
-    if (!routes.length) throw new Error('No traffic-aware route was found between these locations')
-    return { origin, destination, routes }
+    if (routes.length) return { origin, destination, routes }
   }
   const longitudeDelta = destination.longitude - origin.longitude
   const latitudeDelta = destination.latitude - origin.latitude

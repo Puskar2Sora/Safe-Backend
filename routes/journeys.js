@@ -74,8 +74,27 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid journey status' })
   }
 
+  const openJourney = await journeysCollection().findOne(
+    { userId, status: { $in: ['PLANNED', 'ACTIVE'] } },
+    { projection: { _id: 0, id: 1, status: 1 } },
+  )
+  if (openJourney) {
+    return res.status(409).json({
+      success: false,
+      message: 'You already have an open journey. Stop it before planning another journey.',
+      journey: openJourney,
+    })
+  }
+
   const journey = { id: crypto.randomUUID(), userId, origin, destination, selectedRoute, startTime, status, riskScore }
-  await journeysCollection().insertOne(journey)
+  try {
+    await journeysCollection().insertOne(journey)
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ success: false, message: 'You already have an open journey. Stop it before planning another journey.' })
+    }
+    throw error
+  }
   const { _id, ...journeyResponse } = journey
   return res.status(201).json({ success: true, journey: journeyResponse })
 })

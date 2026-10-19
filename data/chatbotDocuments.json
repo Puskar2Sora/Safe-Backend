@@ -1,0 +1,44 @@
+[
+  {
+    "id": "safe-journeys",
+    "title": "Safe journeys",
+    "category": "Journeys",
+    "content": "Use Journey to plan a route between two locations. Review the safety score and route options before starting. When you start a journey, you can share live location with trusted contacts and stop sharing by ending the journey.",
+    "keywords": ["journey", "route", "share location", "travel"]
+  },
+  {
+    "id": "emergency-sos",
+    "title": "Emergency SOS",
+    "category": "Emergencies",
+    "content": "Use the SOS action when you need urgent help. Confirm the alert details and the platform will notify your configured emergency contacts. If you are in immediate danger, contact local emergency services as well; this platform does not replace them.",
+    "keywords": ["sos", "emergency", "urgent", "help", "alert"]
+  },
+  {
+    "id": "trusted-contacts",
+    "title": "Trusted contacts",
+    "category": "Contacts",
+    "content": "Add people you trust from Contacts with their name, phone number, and relationship. Keep contact details current so emergency notifications can reach the right people. You can review or remove contacts at any time.",
+    "keywords": ["contacts", "trusted", "phone", "notifications"]
+  },
+  {
+    "id": "safe-circle",
+    "title": "Safe Circle",
+    "category": "Safe Circle",
+    "content": "Safe Circle lets verified members create or join a temporary local safety network. Circle members can share location while the circle is active. Only active members can see circle activity, and the circle creator can end the circle.",
+    "keywords": ["circle", "members", "location", "community"]
+  },
+  {
+    "id": "incident-reports",
+    "title": "Incident reports",
+    "category": "Reports",
+    "content": "Use Incident Reports to record a safety concern or event. Include the location, time, and useful details. Reports help you keep a record of what happened and can support safer planning in the future.",
+    "keywords": ["incident", "report", "safety concern", "event"]
+  },
+  {
+    "id": "account-security",
+    "title": "Account and privacy",
+    "category": "Account",
+    "content": "Your account requires an authenticated session. Sign out when using a shared device, keep your password private, and review your profile details regularly. Location sharing is opt-in through journeys and active circles.",
+    "keywords": ["account", "privacy", "password", "sign out", "location"]
+  }
+]

@@ -13,6 +13,7 @@ const incidentsRoutes = require('./routes/incidents')
 const journeysRoutes = require('./routes/journeys')
 const emergenciesRoutes = require('./routes/emergencies')
 const safeCirclesRoutes = require('./routes/safeCircles')
+const chatbotRoutes = require('./routes/chatbot')
 const { authenticate, getUserFromToken } = require('./middleware/auth')
 
 const app = express()
@@ -46,6 +47,7 @@ app.use('/api/incidents', authenticate, incidentsRoutes)
 app.use('/api/journeys', authenticate, journeysRoutes)
 app.use('/api/emergencies', authenticate, emergenciesRoutes)
 app.use('/api/safe-circles', authenticate, safeCirclesRoutes)
+app.use('/api/chatbot', authenticate, chatbotRoutes)
 
 const httpServer = http.createServer(app)
 const io = new Server(httpServer, {

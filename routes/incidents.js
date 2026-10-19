@@ -25,6 +25,7 @@ router.post('/', async (req, res) => {
     const coordinates = await geocodeLocation(location.trim())
     const incident = {
       id: crypto.randomUUID(),
+      userId: req.user.id,
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
       category,
@@ -48,7 +49,7 @@ router.get('/', async (req, res) => {
   try {
     // Exclude Mongo's _id from the response - nothing downstream expects it,
     // and this keeps the payload identical to what the old file-based version sent.
-    const incidents = await incidentsCollection().find({}, { projection: { _id: 0 } }).toArray()
+    const incidents = await incidentsCollection().find({ userId: req.user.id }, { projection: { _id: 0 } }).toArray()
     return res.json({ success: true, incidents })
   } catch (error) {
     return res.status(502).json({ success: false, message: 'Unable to load incidents' })
