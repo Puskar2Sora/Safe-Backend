@@ -1,5 +1,5 @@
 const express = require('express')
-const { findRoute, reverseGeocodeLocation, searchLocations } = require('../services/routingService')
+const { findRoute, reverseGeocodeLocation, searchLocations, findNearestPoliceStation } = require('../services/routingService')
 const { scoreRoutes } = require('../services/safetyScoringService')
 
 const router = express.Router()
@@ -59,6 +59,24 @@ router.get('/reverse', async (req, res) => {
     return res.json({ success: true, location })
   } catch (error) {
     return res.status(502).json({ success: false, message: error instanceof Error ? error.message : 'Unable to identify your location' })
+  }
+})
+
+router.get('/nearest-police', async (req, res) => {
+  const latitude = Number(req.query.lat)
+  const longitude = Number(req.query.lon)
+  const coordinatesAreValid = Number.isFinite(latitude) && Number.isFinite(longitude)
+    && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180
+  if (!coordinatesAreValid) return res.status(400).json({ success: false, message: 'Valid coordinates are required' })
+
+  try {
+    const station = await findNearestPoliceStation(latitude, longitude)
+    return res.json({ success: true, station })
+  } catch (error) {
+    return res.status(502).json({
+      success: false,
+      message: error instanceof Error ? error.message : 'Unable to find a nearby police station',
+    })
   }
 })
 

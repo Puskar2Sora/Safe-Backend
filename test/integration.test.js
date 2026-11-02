@@ -63,6 +63,88 @@ test('authentication creates a server session and rejects invalid credentials', 
   assert.equal(me.body.user.id, user.id)
 })
 
+test('profile updates persist and avatar validation returns JSON errors', async (t) => {
+  skipIfUnavailable(t)
+  if (!token) t.skip('authentication setup did not complete')
+
+  const updated = await request(app)
+    .patch('/api/auth/profile')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ name: 'Updated Integration User', phone: '5550199' })
+  assert.equal(updated.status, 200)
+  assert.equal(updated.headers['content-type'].includes('application/json'), true)
+  assert.equal(updated.body.user.name, 'Updated Integration User')
+  assert.equal(updated.body.user.phone, '5550199')
+
+  const unsupported = await request(app)
+    .post('/api/auth/profile/avatar')
+    .set('Authorization', `Bearer ${token}`)
+    .attach('avatar', Buffer.from('not-an-image'), { filename: 'avatar.txt', contentType: 'text/plain' })
+  assert.equal(unsupported.status, 400)
+  assert.equal(unsupported.headers['content-type'].includes('application/json'), true)
+  assert.match(unsupported.body.message, /JPG, PNG, and WebP/)
+
+  const oversized = await request(app)
+    .post('/api/auth/profile/avatar')
+    .set('Authorization', `Bearer ${token}`)
+    .attach('avatar', Buffer.alloc(5 * 1024 * 1024 + 1), { filename: 'large.png', contentType: 'image/png' })
+  assert.equal(oversized.status, 413)
+  assert.equal(oversized.headers['content-type'].includes('application/json'), true)
+  assert.match(oversized.body.message, /5 MB or smaller/)
+})
+
+test('nearest-station endpoint validates auth and returns a station shape', async (t) => {
+  skipIfUnavailable(t)
+  if (!token) t.skip('authentication setup did not complete')
+
+  const unauthorized = await request(app).get('/api/routes/nearest-police?lat=22.57&lon=88.36')
+  assert.equal(unauthorized.status, 401)
+  assert.equal(unauthorized.headers['content-type'].includes('application/json'), true)
+
+  const invalid = await request(app)
+    .get('/api/routes/nearest-police?lat=not-a-coordinate&lon=88.36')
+    .set('Authorization', `Bearer ${token}`)
+  assert.equal(invalid.status, 400)
+  assert.equal(invalid.body.message, 'Valid coordinates are required')
+
+  const originalFetch = global.fetch
+  global.fetch = async () => ({
+    ok: true,
+    json: async () => [{
+      place_id: 123,
+      name: 'Test Police Station',
+      display_name: 'Test Police Station, Test Area',
+      lat: '22.571',
+      lon: '88.361',
+    }],
+  })
+  try {
+    const response = await request(app)
+      .get('/api/routes/nearest-police?lat=22.57&lon=88.36')
+      .set('Authorization', `Bearer ${token}`)
+    assert.equal(response.status, 200)
+    assert.deepEqual(Object.keys(response.body), ['success', 'station'])
+    assert.equal(response.body.station.name, 'Test Police Station')
+    assert.equal(typeof response.body.station.distanceMeters, 'number')
+    assert.equal(typeof response.body.station.distanceKm, 'number')
+    assert.match(response.body.station.directionsUrl, /google\.com\/maps\/dir/)
+  } finally {
+    global.fetch = originalFetch
+  }
+})
+
+test('malformed JSON errors are returned as JSON', async (t) => {
+  skipIfUnavailable(t)
+  const response = await request(app)
+    .patch('/api/auth/profile')
+    .set('Content-Type', 'application/json')
+    .send('{"name":')
+
+  assert.equal(response.status, 500)
+  assert.equal(response.headers['content-type'].includes('application/json'), true)
+  assert.equal(response.body.message, 'The server could not complete that request')
+})
+
 test('contacts require the session owner and persist through read-back', async (t) => {
   skipIfUnavailable(t)
   if (!token) t.skip('authentication setup did not complete')

@@ -7,7 +7,8 @@ const { v2: cloudinary } = require('cloudinary')
 
 const router = express.Router()
 const sessionDurationMs = 7 * 24 * 60 * 60 * 1000
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } })
+const maxAvatarSizeBytes = 5 * 1024 * 1024
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: maxAvatarSizeBytes } })
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -114,7 +115,15 @@ router.patch('/profile', authenticate, async (req, res) => {
   return res.json({ success: true, user })
 })
 
-router.post('/profile/avatar', authenticate, upload.single('avatar'), async (req, res) => {
+router.post('/profile/avatar', authenticate, (req, res, next) => {
+  upload.single('avatar')(req, res, (error) => {
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ success: false, message: 'Profile image must be 5 MB or smaller' })
+    }
+    if (error) return next(error)
+    return next()
+  })
+}, async (req, res) => {
   if (!req.file) return res.status(400).json({ success: false, message: 'An image file is required' })
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(req.file.mimetype)) {
     return res.status(400).json({ success: false, message: 'Only JPG, PNG, and WebP images are supported' })

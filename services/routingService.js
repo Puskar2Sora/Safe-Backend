@@ -5,6 +5,17 @@ const mapboxRoutingUrl = 'https://api.mapbox.com/directions/v5/mapbox/driving-tr
 const googleRoutesUrl = 'https://routes.googleapis.com/directions/v2:computeRoutes'
 const trafficLevels = ['LOW', 'MODERATE', 'HIGH', 'SEVERE']
 
+function distanceBetweenCoordinates(first, second) {
+  const earthRadiusMeters = 6371000
+  const latitudeDelta = (second.latitude - first.latitude) * Math.PI / 180
+  const longitudeDelta = (second.longitude - first.longitude) * Math.PI / 180
+  const firstLatitude = first.latitude * Math.PI / 180
+  const secondLatitude = second.latitude * Math.PI / 180
+  const value = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(firstLatitude) * Math.cos(secondLatitude) * Math.sin(longitudeDelta / 2) ** 2
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value))
+}
+
 function hasUsableApiKey(value) {
   if (typeof value !== 'string' || !value.trim()) return false
   const normalized = value.trim().toLowerCase()
@@ -390,4 +401,45 @@ async function searchLocations(query, userCoords = null) {
   })
 }
 
-module.exports = { findRoute, geocodeLocation, reverseGeocodeLocation, searchLocations, resolveLocation, buildTrafficSegments, estimateTrafficLevel, decodeGooglePolyline, buildGoogleTrafficSegments }
+async function findNearestPoliceStation(latitude, longitude) {
+  const coordinatesAreValid = Number.isFinite(latitude) && Number.isFinite(longitude)
+    && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180
+  if (!coordinatesAreValid) throw new Error('Valid coordinates are required')
+
+  const radius = 0.5
+  const url = `${geocodingUrl}?format=jsonv2&limit=50&addressdetails=1&extratags=1&countrycodes=in&q=police&viewbox=${longitude - radius},${latitude + radius},${longitude + radius},${latitude - radius}&bounded=1`
+  const response = await fetchWithRetry(url, {
+    headers: { 'User-Agent': "Women's Safety Platform MVP" },
+  })
+  if (!response.ok) throw new Error('Police station lookup service is unavailable')
+
+  const results = await response.json()
+  const origin = { latitude, longitude }
+  const stations = Array.isArray(results)
+    ? results
+      .map((item) => {
+        const stationLatitude = Number(item.lat)
+        const stationLongitude = Number(item.lon)
+        const name = item.name || item.address?.amenity || item.display_name?.split(',')[0]
+        if (!name || !Number.isFinite(stationLatitude) || !Number.isFinite(stationLongitude)) return null
+        const distanceMeters = distanceBetweenCoordinates(origin, { latitude: stationLatitude, longitude: stationLongitude })
+        return {
+          placeId: item.place_id,
+          name,
+          displayName: item.display_name,
+          latitude: stationLatitude,
+          longitude: stationLongitude,
+          distanceMeters: Math.round(distanceMeters),
+          distanceKm: Number((distanceMeters / 1000).toFixed(2)),
+          directionsUrl: `https://www.google.com/maps/dir/?api=1&destination=${stationLatitude},${stationLongitude}`,
+        }
+      })
+      .filter(Boolean)
+      .sort((first, second) => first.distanceMeters - second.distanceMeters)
+    : []
+
+  if (!stations.length) throw new Error('No police station was found near your location')
+  return stations[0]
+}
+
+module.exports = { findRoute, geocodeLocation, reverseGeocodeLocation, searchLocations, resolveLocation, findNearestPoliceStation, distanceBetweenCoordinates, buildTrafficSegments, estimateTrafficLevel, decodeGooglePolyline, buildGoogleTrafficSegments }

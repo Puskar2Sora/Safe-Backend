@@ -48,6 +48,11 @@ app.use('/api/journeys', authenticate, journeysRoutes)
 app.use('/api/emergencies', authenticate, emergenciesRoutes)
 app.use('/api/safe-circles', authenticate, safeCirclesRoutes)
 app.use('/api/chatbot', authenticate, chatbotRoutes)
+app.use((error, req, res, next) => {
+  console.error('Unhandled API error:', error)
+  if (res.headersSent) return next(error)
+  return res.status(500).json({ success: false, message: 'The server could not complete that request' })
+})
 
 const httpServer = http.createServer(app)
 const io = new Server(httpServer, {

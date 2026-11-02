@@ -1,6 +1,12 @@
 const assert = require('node:assert/strict')
 const { test } = require('node:test')
-const { buildTrafficSegments, buildGoogleTrafficSegments, decodeGooglePolyline, estimateTrafficLevel } = require('../services/routingService')
+const { buildTrafficSegments, buildGoogleTrafficSegments, decodeGooglePolyline, distanceBetweenCoordinates, estimateTrafficLevel } = require('../services/routingService')
+
+test('distance calculation returns meters for nearby coordinates', () => {
+  const distance = distanceBetweenCoordinates({ latitude: 22.5726, longitude: 88.3639 }, { latitude: 22.5826, longitude: 88.3639 })
+
+  assert.ok(distance > 1000 && distance < 1200)
+})
 
 test('traffic segments preserve route geometry and classify estimated conditions', () => {
   const coordinates = [[22.5, 88.3], [22.51, 88.31], [22.52, 88.32]]
