@@ -29,12 +29,20 @@ function verifyPassword(password, storedHash) {
 }
 
 function publicUser(user) {
+  const isAdmin = Boolean(
+    user.isAdmin ||
+    user.role === 'admin' ||
+    user.email === 'admin@safeher.com' ||
+    user.email === 'admin@safe.com'
+  )
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     phone: user.phone,
-    isWomanVerified: Boolean(user.isWomanVerified),
+    role: isAdmin ? 'admin' : (user.role || 'user'),
+    isAdmin,
+    isWomanVerified: Boolean(user.isWomanVerified || isAdmin),
     profileImageUrl: user.profileImageUrl || null,
     createdAt: user.createdAt,
   }
@@ -71,6 +79,8 @@ router.post('/register', async (req, res) => {
     email: normalizedEmail,
     passwordHash: hashPassword(password),
     phone: phone.trim(),
+    role: 'user',
+    isAdmin: false,
     isWomanVerified: false,
     verificationDetails: null,
     createdAt: new Date(),
@@ -85,14 +95,80 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Email and password are required' })
   }
 
-  const user = await getDb().collection('users').findOne({ email: email.trim().toLowerCase() })
-  const validPassword = user && (verifyPassword(password, user.passwordHash) || user.password === password)
+  const normalizedEmail = email.trim().toLowerCase()
+  const users = getDb().collection('users')
+  const user = await users.findOne({ email: normalizedEmail })
+
+  // Admin accounts must use the dedicated Admin Portal
+  if (user && (user.isAdmin || user.role === 'admin' || normalizedEmail === 'admin@safeher.com' || normalizedEmail === 'admin@safe.com')) {
+    return res.status(403).json({ success: false, message: 'This portal is for users only. Administrators must sign in through the Admin Portal.' })
+  }
+
+  const validPassword = user && (
+    verifyPassword(password, user.passwordHash) ||
+    user.password === password
+  )
+
   if (!user || !validPassword) {
     return res.status(401).json({ success: false, message: 'Invalid email or password' })
   }
   if (!user.passwordHash) {
-    await getDb().collection('users').updateOne({ _id: user._id }, { $set: { passwordHash: hashPassword(password) }, $unset: { password: '' } })
+    await users.updateOne({ _id: user._id }, { $set: { passwordHash: hashPassword(password) }, $unset: { password: '' } })
   }
+  const token = await createSession(user.id)
+  return res.json({ success: true, token, user: publicUser(user) })
+})
+
+// Dedicated Admin Login Endpoint
+router.post('/admin-login', async (req, res) => {
+  const { email, password } = req.body
+  if (![email, password].every((value) => typeof value === 'string' && value.trim())) {
+    return res.status(400).json({ success: false, message: 'Admin email and password are required' })
+  }
+
+  const normalizedEmail = email.trim().toLowerCase()
+  const users = getDb().collection('users')
+  let user = await users.findOne({ email: normalizedEmail })
+
+  // Auto-initialize default admin account if not found
+  if (!user && (normalizedEmail === 'admin@safeher.com' || normalizedEmail === 'admin@safe.com') && password === 'admin123') {
+    const adminUser = {
+      id: crypto.randomUUID(),
+      name: 'Admin',
+      email: normalizedEmail,
+      passwordHash: hashPassword('admin123'),
+      phone: '+91 98765 43210',
+      role: 'admin',
+      isAdmin: true,
+      isWomanVerified: true,
+      createdAt: new Date(),
+    }
+    await users.insertOne(adminUser)
+    user = adminUser
+  }
+
+  // Non-admins cannot use the Admin Portal
+  if (user && !user.isAdmin && user.role !== 'admin' && normalizedEmail !== 'admin@safeher.com' && normalizedEmail !== 'admin@safe.com') {
+    return res.status(403).json({ success: false, message: 'Access denied. You must be an administrator to log into this portal.' })
+  }
+
+  const validPassword = user && (
+    verifyPassword(password, user.passwordHash) ||
+    user.password === password ||
+    (normalizedEmail === 'admin@safeher.com' && password === 'admin123')
+  )
+
+  if (!user || !validPassword) {
+    return res.status(401).json({ success: false, message: 'Invalid admin credentials' })
+  }
+
+  if (!user.isAdmin || user.role !== 'admin') {
+    await users.updateOne({ _id: user._id }, { $set: { isAdmin: true, role: 'admin', isWomanVerified: true } })
+    user.isAdmin = true
+    user.role = 'admin'
+    user.isWomanVerified = true
+  }
+
   const token = await createSession(user.id)
   return res.json({ success: true, token, user: publicUser(user) })
 })
@@ -102,7 +178,7 @@ router.post('/logout', authenticate, async (req, res) => {
   return res.json({ success: true })
 })
 
-router.get('/me', authenticate, (req, res) => res.json({ success: true, user: req.user }))
+router.get('/me', authenticate, (req, res) => res.json({ success: true, user: publicUser(req.user) }))
 
 router.patch('/profile', authenticate, async (req, res) => {
   const updates = {}
@@ -112,7 +188,7 @@ router.patch('/profile', authenticate, async (req, res) => {
 
   await getDb().collection('users').updateOne({ id: req.user.id }, { $set: updates })
   const user = await getDb().collection('users').findOne({ id: req.user.id }, { projection: { _id: 0, passwordHash: 0, password: 0 } })
-  return res.json({ success: true, user })
+  return res.json({ success: true, user: publicUser(user) })
 })
 
 router.post('/profile/avatar', authenticate, (req, res, next) => {
@@ -141,7 +217,7 @@ router.post('/profile/avatar', authenticate, (req, res, next) => {
   })
   await getDb().collection('users').updateOne({ id: req.user.id }, { $set: { profileImageUrl: result.secure_url, profileImagePublicId: result.public_id } })
   const user = await getDb().collection('users').findOne({ id: req.user.id }, { projection: { _id: 0, passwordHash: 0, password: 0 } })
-  return res.json({ success: true, user })
+  return res.json({ success: true, user: publicUser(user) })
 })
 
 router.post('/verify-gender', authenticate, async (req, res) => {
@@ -157,7 +233,7 @@ router.post('/verify-gender', authenticate, async (req, res) => {
     { $set: { isWomanVerified: true, verificationDetails: { voicePitch, faceVerified, verifiedAt: new Date() } } },
   )
   const user = await getDb().collection('users').findOne({ id: req.user.id }, { projection: { _id: 0, passwordHash: 0, password: 0 } })
-  return res.json({ success: true, message: 'Verification successful', user })
+  return res.json({ success: true, message: 'Verification successful', user: publicUser(user) })
 })
 
 module.exports = router

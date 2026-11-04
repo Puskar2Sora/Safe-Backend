@@ -1,6 +1,6 @@
 const express = require('express')
 const { findRoute, reverseGeocodeLocation, searchLocations, findNearestPoliceStation } = require('../services/routingService')
-const { scoreRoutes } = require('../services/safetyScoringService')
+const { scoreRoutes, assessLocationSafety } = require('../services/safetyScoringService')
 
 const router = express.Router()
 
@@ -76,6 +76,24 @@ router.get('/nearest-police', async (req, res) => {
     return res.status(502).json({
       success: false,
       message: error instanceof Error ? error.message : 'Unable to find a nearby police station',
+    })
+  }
+})
+
+router.get('/safety-assessment', async (req, res) => {
+  const latitude = Number(req.query.lat)
+  const longitude = Number(req.query.lon)
+  const coordinatesAreValid = Number.isFinite(latitude) && Number.isFinite(longitude)
+    && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180
+  if (!coordinatesAreValid) return res.status(400).json({ success: false, message: 'Valid coordinates are required' })
+
+  try {
+    const assessment = await assessLocationSafety(latitude, longitude)
+    return res.json({ success: true, assessment })
+  } catch (error) {
+    return res.status(502).json({
+      success: false,
+      message: error instanceof Error ? error.message : 'Unable to assess location safety',
     })
   }
 })

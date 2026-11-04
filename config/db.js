@@ -54,3 +54,4 @@ async function closeDatabase() {
 }
 
 module.exports = { connectToDatabase, getDb, closeDatabase }
+

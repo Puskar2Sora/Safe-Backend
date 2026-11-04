@@ -51,4 +51,60 @@ async function scoreRoutes(routes) {
   return routes.map((route) => scoreRoute(route, incidents))
 }
 
-module.exports = { scoreRoutes }
+async function assessLocationSafety(latitude, longitude, radiusMeters = 3000) {
+  const incidents = await getDb().collection('incidents').find({}, { projection: { _id: 0 } }).toArray()
+
+  const nearbyIncidents = incidents
+    .map((incident) => {
+      const distanceMeters = distanceBetween(latitude, longitude, incident.latitude, incident.longitude)
+      return { ...incident, distanceMeters }
+    })
+    .filter((incident) => incident.distanceMeters <= radiusMeters)
+    .sort((a, b) => a.distanceMeters - b.distanceMeters)
+
+  const totalRisk = nearbyIncidents.reduce((total, incident) => {
+    const weight = severityWeights[String(incident.severity).toLowerCase()] || severityWeights.moderate
+    return total + weight * recencyMultiplier(incident.date)
+  }, 0)
+
+  // Safety score scale from 0 to 100 (100 = completely safe, lower = riskier)
+  const safetyScore = Math.max(10, Math.min(100, Math.round(100 - Math.min(90, totalRisk))))
+  const riskLevel = getRiskLevel(totalRisk)
+
+  let riskLabel = 'Low'
+  let riskSubtext = 'No high-risk zones detected in your area.'
+  let safetyLabel = 'Safe'
+
+  if (riskLevel === 'LOW') {
+    riskLabel = 'Low'
+    safetyLabel = safetyScore >= 90 ? 'Very Safe' : 'Safe'
+    riskSubtext = nearbyIncidents.length === 0
+      ? 'No recorded incidents within 3 km.'
+      : `${nearbyIncidents.length} minor concern in the area.`
+  } else if (riskLevel === 'MODERATE') {
+    riskLabel = 'Moderate'
+    safetyLabel = 'Moderate'
+    riskSubtext = `${nearbyIncidents.length} incident${nearbyIncidents.length === 1 ? '' : 's'} recorded within 3 km.`
+  } else if (riskLevel === 'HIGH') {
+    riskLabel = 'High'
+    safetyLabel = 'Caution'
+    riskSubtext = `${nearbyIncidents.length} incidents nearby. Exercise caution.`
+  } else {
+    riskLabel = 'Critical'
+    safetyLabel = 'Alert'
+    riskSubtext = 'Multiple severe incidents recorded nearby.'
+  }
+
+  return {
+    safetyScore,
+    safetyLabel,
+    riskLevel,
+    riskLabel,
+    riskSubtext,
+    incidentCount: nearbyIncidents.length,
+    radiusMeters,
+    nearestIncident: nearbyIncidents[0] || null,
+  }
+}
+
+module.exports = { scoreRoutes, assessLocationSafety }
