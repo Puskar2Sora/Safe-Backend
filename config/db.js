@@ -37,6 +37,12 @@ async function connectToDatabase() {
     { userId: 1, status: 1 },
     { unique: true, partialFilterExpression: { status: { $in: ['PLANNED', 'ACTIVE'] } } },
   )
+  await Promise.all([
+    db.collection('sessions').createIndex({ tokenHash: 1 }, { unique: true }),
+    db.collection('sessions').createIndex({ userId: 1, expiresAt: 1 }),
+    db.collection('adminAuditLogs').createIndex({ createdAt: -1 }),
+    db.collection('adminAuditLogs').createIndex({ actorId: 1, createdAt: -1 }),
+  ])
   console.log('Connected to MongoDB Atlas')
   return db
 }
@@ -54,4 +60,3 @@ async function closeDatabase() {
 }
 
 module.exports = { connectToDatabase, getDb, closeDatabase }
-

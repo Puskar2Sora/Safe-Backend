@@ -1,20 +1,10 @@
 const crypto = require('crypto')
 const express = require('express')
 const { getDb } = require('../config/db')
-const { authenticate } = require('../middleware/auth')
+const { authenticate, requireAdmin } = require('../middleware/auth')
+const { writeAuditLog } = require('../utils/audit')
 
 const router = express.Router()
-
-function requireAdmin(req, res, next) {
-  const user = req.user
-  const isAdmin = Boolean(
-    user && (user.isAdmin || user.role === 'admin' || user.email === 'admin@safeher.com' || user.email === 'admin@safe.com')
-  )
-  if (!isAdmin) {
-    return res.status(403).json({ success: false, message: 'Admin access required' })
-  }
-  return next()
-}
 
 // GET /api/admin/stats - returns strictly real metrics computed directly from database collections
 router.get('/stats', authenticate, requireAdmin, async (req, res) => {
@@ -178,6 +168,7 @@ router.post('/broadcast', authenticate, requireAdmin, async (req, res) => {
     if (io) {
       io.emit('safety_broadcast', alert)
     }
+    await writeAuditLog({ req, action: 'admin.broadcast.create', targetType: 'broadcast', targetId: alert.id, metadata: { severity: alert.severity, zone: alert.zone } })
     const { _id, ...resAlert } = alert
     return res.json({ success: true, message: 'Emergency broadcast dispatched successfully', alert: resAlert })
   } catch (err) {
@@ -196,6 +187,21 @@ router.get('/broadcasts', authenticate, requireAdmin, async (req, res) => {
     return res.json({ success: true, alerts })
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to load broadcasts' })
+  }
+})
+
+router.get('/audit-logs', authenticate, requireAdmin, async (req, res) => {
+  const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 50, 1), 100)
+  try {
+    const logs = await getDb().collection('adminAuditLogs')
+      .find({}, { projection: { _id: 0 } })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray()
+    return res.json({ success: true, logs })
+  } catch (error) {
+    console.error('Error fetching admin audit logs:', error)
+    return res.status(500).json({ success: false, message: 'Failed to load audit logs' })
   }
 })
 
@@ -251,8 +257,7 @@ router.patch('/users/:userId/verify', authenticate, requireAdmin, async (req, re
     const update = { isWomanVerified: Boolean(isWomanVerified) }
     if (isWomanVerified) {
       update.verificationDetails = {
-        faceVerified: true,
-        voicePitch: 220,
+        manualReview: true,
         verifiedAt: new Date(),
         manuallyVerifiedBy: req.user.email || 'Admin',
       }
@@ -267,6 +272,13 @@ router.patch('/users/:userId/verify', authenticate, requireAdmin, async (req, re
       return res.status(404).json({ success: false, message: 'User not found' })
     }
 
+    await writeAuditLog({
+      req,
+      action: 'admin.user.verify',
+      targetType: 'user',
+      targetId: userId,
+      metadata: { isWomanVerified: Boolean(isWomanVerified) },
+    })
     return res.json({ success: true, message: `User verification updated to ${isWomanVerified}` })
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to update user verification' })

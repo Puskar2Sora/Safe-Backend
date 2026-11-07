@@ -1,12 +1,15 @@
 const crypto = require('crypto')
 const express = require('express')
 const { getDb } = require('../config/db')
-const { authenticate } = require('../middleware/auth')
+const { authenticate, requireAdmin } = require('../middleware/auth')
+const { rateLimit } = require('../middleware/rateLimit')
+const { writeAuditLog } = require('../utils/audit')
 const multer = require('multer')
 const { v2: cloudinary } = require('cloudinary')
 
 const router = express.Router()
 const sessionDurationMs = 7 * 24 * 60 * 60 * 1000
+const adminSessionDurationMs = 30 * 60 * 1000
 const maxAvatarSizeBytes = 5 * 1024 * 1024
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: maxAvatarSizeBytes } })
 
@@ -29,12 +32,7 @@ function verifyPassword(password, storedHash) {
 }
 
 function publicUser(user) {
-  const isAdmin = Boolean(
-    user.isAdmin ||
-    user.role === 'admin' ||
-    user.email === 'admin@safeher.com' ||
-    user.email === 'admin@safe.com'
-  )
+  const isAdmin = user.role === 'admin'
   return {
     id: user.id,
     name: user.name,
@@ -48,14 +46,15 @@ function publicUser(user) {
   }
 }
 
-async function createSession(userId) {
+async function createSession(userId, { isAdmin = false } = {}) {
   const token = crypto.randomBytes(32).toString('base64url')
   await getDb().collection('sessions').insertOne({
     userId,
+    isAdmin,
     tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
     createdAt: new Date(),
     lastUsedAt: new Date(),
-    expiresAt: new Date(Date.now() + sessionDurationMs),
+    expiresAt: new Date(Date.now() + (isAdmin ? adminSessionDurationMs : sessionDurationMs)),
   })
   return token
 }
@@ -89,7 +88,11 @@ router.post('/register', async (req, res) => {
   return res.status(201).json({ success: true, message: 'Registration successful', user: publicUser(user) })
 })
 
-router.post('/login', async (req, res) => {
+router.post('/login', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many login attempts. Please try again later.',
+}), async (req, res) => {
   const { email, password } = req.body
   if (![email, password].every((value) => typeof value === 'string' && value.trim())) {
     return res.status(400).json({ success: false, message: 'Email and password are required' })
@@ -100,7 +103,7 @@ router.post('/login', async (req, res) => {
   const user = await users.findOne({ email: normalizedEmail })
 
   // Admin accounts must use the dedicated Admin Portal
-  if (user && (user.isAdmin || user.role === 'admin' || normalizedEmail === 'admin@safeher.com' || normalizedEmail === 'admin@safe.com')) {
+  if (user?.role === 'admin') {
     return res.status(403).json({ success: false, message: 'This portal is for users only. Administrators must sign in through the Admin Portal.' })
   }
 
@@ -120,7 +123,11 @@ router.post('/login', async (req, res) => {
 })
 
 // Dedicated Admin Login Endpoint
-router.post('/admin-login', async (req, res) => {
+router.post('/admin-login', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: 'Too many admin login attempts. Please try again later.',
+}), async (req, res) => {
   const { email, password } = req.body
   if (![email, password].every((value) => typeof value === 'string' && value.trim())) {
     return res.status(400).json({ success: false, message: 'Admin email and password are required' })
@@ -128,54 +135,37 @@ router.post('/admin-login', async (req, res) => {
 
   const normalizedEmail = email.trim().toLowerCase()
   const users = getDb().collection('users')
-  let user = await users.findOne({ email: normalizedEmail })
-
-  // Auto-initialize default admin account if not found
-  if (!user && (normalizedEmail === 'admin@safeher.com' || normalizedEmail === 'admin@safe.com') && password === 'admin123') {
-    const adminUser = {
-      id: crypto.randomUUID(),
-      name: 'Admin',
-      email: normalizedEmail,
-      passwordHash: hashPassword('admin123'),
-      phone: '+91 98765 43210',
-      role: 'admin',
-      isAdmin: true,
-      isWomanVerified: true,
-      createdAt: new Date(),
-    }
-    await users.insertOne(adminUser)
-    user = adminUser
-  }
-
-  // Non-admins cannot use the Admin Portal
-  if (user && !user.isAdmin && user.role !== 'admin' && normalizedEmail !== 'admin@safeher.com' && normalizedEmail !== 'admin@safe.com') {
-    return res.status(403).json({ success: false, message: 'Access denied. You must be an administrator to log into this portal.' })
-  }
-
-  const validPassword = user && (
-    verifyPassword(password, user.passwordHash) ||
-    user.password === password ||
-    (normalizedEmail === 'admin@safeher.com' && password === 'admin123')
-  )
+  const user = await users.findOne({ email: normalizedEmail, role: 'admin' })
+  const validPassword = user && verifyPassword(password, user.passwordHash)
 
   if (!user || !validPassword) {
+    await writeAuditLog({
+      req,
+      action: 'admin.login',
+      outcome: 'failure',
+      metadata: { email: normalizedEmail },
+    })
     return res.status(401).json({ success: false, message: 'Invalid admin credentials' })
   }
 
-  if (!user.isAdmin || user.role !== 'admin') {
-    await users.updateOne({ _id: user._id }, { $set: { isAdmin: true, role: 'admin', isWomanVerified: true } })
-    user.isAdmin = true
-    user.role = 'admin'
-    user.isWomanVerified = true
-  }
-
-  const token = await createSession(user.id)
+  req.user = user
+  const token = await createSession(user.id, { isAdmin: true })
+  await writeAuditLog({ req, action: 'admin.login', metadata: { sessionDurationMinutes: 30 } })
   return res.json({ success: true, token, user: publicUser(user) })
 })
 
 router.post('/logout', authenticate, async (req, res) => {
   await getDb().collection('sessions').deleteOne({ _id: req.session._id })
   return res.json({ success: true })
+})
+
+router.post('/admin/sessions/revoke-all', authenticate, requireAdmin, async (req, res) => {
+  const result = await getDb().collection('sessions').deleteMany({
+    userId: req.user.id,
+    _id: { $ne: req.session._id },
+  })
+  await writeAuditLog({ req, action: 'admin.sessions.revoke_all', metadata: { revokedCount: result.deletedCount } })
+  return res.json({ success: true, revokedCount: result.deletedCount })
 })
 
 router.get('/me', authenticate, (req, res) => res.json({ success: true, user: publicUser(req.user) }))
