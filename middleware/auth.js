@@ -10,6 +10,7 @@ async function getUserFromToken(token) {
 
   const user = await getDb().collection('users').findOne({ id: session.userId }, { projection: { _id: 0, passwordHash: 0, password: 0 } })
   if (!user) return null
+  if (user.suspended) return null
   return { user, session }
 }
 

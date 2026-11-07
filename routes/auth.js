@@ -138,7 +138,7 @@ router.post('/admin-login', rateLimit({
   const user = await users.findOne({ email: normalizedEmail, role: 'admin' })
   const validPassword = user && verifyPassword(password, user.passwordHash)
 
-  if (!user || !validPassword) {
+  if (!user || !validPassword || user.suspended) {
     await writeAuditLog({
       req,
       action: 'admin.login',

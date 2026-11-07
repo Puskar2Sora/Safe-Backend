@@ -401,6 +401,39 @@ router.patch('/users/:userId/verify', authenticate, requireAdmin, async (req, re
       targetId: userId,
       metadata: { isWomanVerified: Boolean(isWomanVerified) },
     })
+
+    router.patch('/users/:userId/suspension', authenticate, requireAdmin, async (req, res) => {
+      const { suspended, reason = '' } = req.body
+      if (typeof suspended !== 'boolean') return res.status(400).json({ success: false, message: 'Suspended must be a boolean' })
+      if (req.params.userId === req.user.id) return res.status(400).json({ success: false, message: 'You cannot suspend your own account' })
+      const db = getDb()
+      const result = await db.collection('users').updateOne(
+        { id: req.params.userId, role: { $ne: 'admin' } },
+        { $set: { suspended, suspensionReason: String(reason).trim(), suspendedAt: suspended ? new Date() : null, suspendedBy: suspended ? req.user.id : null } },
+      )
+      if (!result.matchedCount) return res.status(404).json({ success: false, message: 'User not found or cannot be suspended' })
+      if (suspended) await db.collection('sessions').deleteMany({ userId: req.params.userId })
+      await writeAuditLog({ req, action: suspended ? 'admin.user.suspend' : 'admin.user.unsuspend', targetType: 'user', targetId: req.params.userId, metadata: { reason } })
+      return res.json({ success: true, suspended })
+    })
+
+    router.patch('/users/:userId/role', authenticate, requireAdmin, async (req, res) => {
+      const allowedRoles = ['user', 'admin']
+      if (!allowedRoles.includes(req.body.role) || req.params.userId === req.user.id) {
+        return res.status(400).json({ success: false, message: 'A valid role different from your own is required' })
+      }
+      const result = await getDb().collection('users').updateOne({ id: req.params.userId }, { $set: { role: req.body.role, isAdmin: req.body.role === 'admin' } })
+      if (!result.matchedCount) return res.status(404).json({ success: false, message: 'User not found' })
+      if (req.body.role !== 'admin') await getDb().collection('sessions').deleteMany({ userId: req.params.userId })
+      await writeAuditLog({ req, action: 'admin.user.role.update', targetType: 'user', targetId: req.params.userId, metadata: { role: req.body.role } })
+      return res.json({ success: true, role: req.body.role })
+    })
+
+    router.post('/users/:userId/revoke-sessions', authenticate, requireAdmin, async (req, res) => {
+      const result = await getDb().collection('sessions').deleteMany({ userId: req.params.userId })
+      await writeAuditLog({ req, action: 'admin.user.sessions.revoke', targetType: 'user', targetId: req.params.userId, metadata: { revokedCount: result.deletedCount } })
+      return res.json({ success: true, revokedCount: result.deletedCount })
+    })
     return res.json({ success: true, message: `User verification updated to ${isWomanVerified}` })
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to update user verification' })
@@ -419,6 +452,69 @@ router.get('/incidents', authenticate, requireAdmin, async (req, res) => {
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Failed to load incidents' })
   }
+})
+
+router.patch('/incidents/:incidentId', authenticate, requireAdmin, async (req, res) => {
+  const allowedStatuses = ['OPEN', 'IN_REVIEW', 'RESOLVED']
+  const { status, resolution, assignedTo } = req.body
+  if (status !== undefined && !allowedStatuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid incident status' })
+  const updates = {}
+  if (status) updates.status = status
+  if (typeof resolution === 'string') updates.resolution = resolution.trim()
+  if (typeof assignedTo === 'string') updates.assignedTo = assignedTo.trim()
+  if (!Object.keys(updates).length) return res.status(400).json({ success: false, message: 'No incident changes provided' })
+  if (status === 'RESOLVED') updates.resolvedAt = new Date()
+  const result = await getDb().collection('incidents').updateOne({ id: req.params.incidentId }, { $set: updates })
+  if (!result.matchedCount) return res.status(404).json({ success: false, message: 'Incident not found' })
+  await writeAuditLog({ req, action: 'admin.incident.update', targetType: 'incident', targetId: req.params.incidentId, metadata: updates })
+  return res.json({ success: true, updates })
+})
+
+router.post('/incidents/:incidentId/notes', authenticate, requireAdmin, async (req, res) => {
+  if (typeof req.body.note !== 'string' || !req.body.note.trim()) return res.status(400).json({ success: false, message: 'Internal note is required' })
+  const note = { id: crypto.randomUUID(), text: req.body.note.trim(), authorId: req.user.id, authorName: req.user.name, createdAt: new Date() }
+  const result = await getDb().collection('incidents').updateOne({ id: req.params.incidentId }, { $push: { internalNotes: note } })
+  if (!result.matchedCount) return res.status(404).json({ success: false, message: 'Incident not found' })
+  await writeAuditLog({ req, action: 'admin.incident.note.create', targetType: 'incident', targetId: req.params.incidentId })
+  return res.status(201).json({ success: true, note })
+})
+
+router.post('/incidents/:incidentId/evidence', authenticate, requireAdmin, async (req, res) => {
+  const { label, url } = req.body
+  if (![label, url].every((value) => typeof value === 'string' && value.trim())) return res.status(400).json({ success: false, message: 'Evidence label and URL are required' })
+  const evidence = { id: crypto.randomUUID(), label: label.trim(), url: url.trim(), addedBy: req.user.id, createdAt: new Date() }
+  const result = await getDb().collection('incidents').updateOne({ id: req.params.incidentId }, { $push: { evidence } })
+  if (!result.matchedCount) return res.status(404).json({ success: false, message: 'Incident not found' })
+  await writeAuditLog({ req, action: 'admin.incident.evidence.create', targetType: 'incident', targetId: req.params.incidentId })
+  return res.status(201).json({ success: true, evidence })
+})
+
+router.get('/export/:resource', authenticate, requireAdmin, async (req, res) => {
+  const resources = { users: 'users', incidents: 'incidents', journeys: 'journeys', audit: 'adminAuditLogs' }
+  const collectionName = resources[req.params.resource]
+  if (!collectionName) return res.status(404).json({ success: false, message: 'Unsupported export resource' })
+  const rows = await getDb().collection(collectionName).find({}, { projection: { _id: 0, password: 0, passwordHash: 0 } }).limit(5000).toArray()
+  const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))].filter((key) => !['internalNotes', 'evidence', 'contacts'].includes(key))
+  const csvValue = (value) => `"${String(value ?? '').replaceAll('"', '""').replaceAll('\n', ' ')}"`
+  const csv = [keys.join(','), ...rows.map((row) => keys.map((key) => csvValue(typeof row[key] === 'object' ? JSON.stringify(row[key]) : row[key])).join(','))].join('\n')
+  await writeAuditLog({ req, action: 'admin.export', targetType: req.params.resource, metadata: { count: rows.length } })
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', `attachment; filename="safeher-${req.params.resource}.csv"`)
+  return res.send(csv)
+})
+
+router.get('/analytics', authenticate, requireAdmin, async (req, res) => {
+  const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const to = req.query.to ? new Date(req.query.to) : new Date()
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) return res.status(400).json({ success: false, message: 'Valid from and to dates are required' })
+  const db = getDb()
+  const [incidents, emergencies, resolved] = await Promise.all([
+    db.collection('incidents').countDocuments({ date: { $gte: from.toISOString(), $lte: to.toISOString() } }),
+    db.collection('emergencies').countDocuments({ timestamp: { $gte: from, $lte: to } }),
+    db.collection('emergencies').find({ status: 'RESOLVED', timestamp: { $gte: from, $lte: to }, resolvedAt: { $exists: true } }, { projection: { timestamp: 1, resolvedAt: 1 } }).toArray(),
+  ])
+  const responseMinutes = resolved.map((item) => (new Date(item.resolvedAt) - new Date(item.timestamp)) / 60000).filter((value) => Number.isFinite(value) && value >= 0)
+  return res.json({ success: true, range: { from, to }, metrics: { incidents, emergencies, resolvedEmergencies: resolved.length, averageResponseMinutes: responseMinutes.length ? Math.round(responseMinutes.reduce((sum, value) => sum + value, 0) / responseMinutes.length) : null, fastestResponseMinutes: responseMinutes.length ? Math.round(Math.min(...responseMinutes)) : null } })
 })
 
 router.get('/live-journeys', authenticate, requireAdmin, async (req, res) => {
