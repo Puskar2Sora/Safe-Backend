@@ -2,6 +2,7 @@ const crypto = require('crypto')
 const express = require('express')
 const { getDb } = require('../config/db')
 const { geocodeLocation } = require('../services/routingService')
+const { getPlatformSettings } = require('../utils/platformSettings')
 
 const router = express.Router()
 const categories = ['Harassment', 'Stalking', 'Theft', 'Suspicious Activity', 'Assault', 'Unsafe Road', 'Poor Lighting', 'Other']
@@ -12,6 +13,8 @@ function incidentsCollection() {
 }
 
 router.post('/', async (req, res) => {
+  const settings = await getPlatformSettings()
+  if (!settings.incidentReportingEnabled) return res.status(503).json({ success: false, message: 'Incident reporting is temporarily disabled by an administrator' })
   const { category, severity, description, location } = req.body
 
   if (![category, severity, description, location].every((value) => typeof value === 'string' && value.trim())) {

@@ -3,13 +3,40 @@ const express = require('express')
 const { getDb } = require('../config/db')
 const { authenticate, requireAdmin } = require('../middleware/auth')
 const { writeAuditLog } = require('../utils/audit')
+const { getPlatformSettings } = require('../utils/platformSettings')
 
 const router = express.Router()
 const defaultAdminSettings = {
   alertRadius: '5 km',
   routingProvider: 'google',
   autoDispatchEnabled: true,
+  emergencyAlertsEnabled: true,
+  liveJourneyTrackingEnabled: true,
+  adminNotificationsEnabled: true,
+  incidentReportingEnabled: true,
+  broadcastsEnabled: true,
+  auditLoggingEnabled: true,
+  locationSharingEnabled: true,
+  requireWomanVerification: false,
+  maintenanceMode: false,
+  revokeSessionsOnSuspension: true,
+  journeyUpdateIntervalSeconds: 10,
+  notificationRetentionDays: 90,
 }
+
+const booleanSettingKeys = [
+  'autoDispatchEnabled',
+  'emergencyAlertsEnabled',
+  'liveJourneyTrackingEnabled',
+  'adminNotificationsEnabled',
+  'incidentReportingEnabled',
+  'broadcastsEnabled',
+  'auditLoggingEnabled',
+  'locationSharingEnabled',
+  'requireWomanVerification',
+  'maintenanceMode',
+  'revokeSessionsOnSuspension',
+]
 
 async function countByDate(collection, field, start, end) {
   const [result] = await collection.aggregate([
@@ -241,18 +268,32 @@ router.get('/settings', authenticate, requireAdmin, async (req, res) => {
 })
 
 router.patch('/settings', authenticate, requireAdmin, async (req, res) => {
-  const { alertRadius, routingProvider, autoDispatchEnabled } = req.body
+  const settings = { ...defaultAdminSettings }
+  Object.keys(defaultAdminSettings).forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(req.body, key)) settings[key] = req.body[key]
+  })
   const validRadii = ['2 km', '5 km', '10 km']
   const validProviders = ['google', 'mapbox', 'osm']
-  if (!validRadii.includes(alertRadius) || !validProviders.includes(routingProvider) || typeof autoDispatchEnabled !== 'boolean') {
+  const hasInvalidBoolean = booleanSettingKeys.some((key) => typeof settings[key] !== 'boolean')
+  if (
+    !validRadii.includes(settings.alertRadius) ||
+    !validProviders.includes(settings.routingProvider) ||
+    hasInvalidBoolean ||
+    !Number.isInteger(settings.journeyUpdateIntervalSeconds) ||
+    settings.journeyUpdateIntervalSeconds < 5 ||
+    settings.journeyUpdateIntervalSeconds > 60 ||
+    !Number.isInteger(settings.notificationRetentionDays) ||
+    settings.notificationRetentionDays < 7 ||
+    settings.notificationRetentionDays > 365
+  ) {
     return res.status(400).json({ success: false, message: 'Invalid platform settings' })
   }
 
   try {
-    const settings = { id: 'platform', alertRadius, routingProvider, autoDispatchEnabled, updatedAt: new Date(), updatedBy: req.user.id }
-    await getDb().collection('adminSettings').replaceOne({ id: 'platform' }, settings, { upsert: true })
-    await writeAuditLog({ req, action: 'admin.settings.update', targetType: 'settings', targetId: 'platform', metadata: { alertRadius, routingProvider, autoDispatchEnabled } })
-    return res.json({ success: true, settings: { ...settings } })
+    const storedSettings = { id: 'platform', ...settings, updatedAt: new Date(), updatedBy: req.user.id }
+    await getDb().collection('adminSettings').replaceOne({ id: 'platform' }, storedSettings, { upsert: true })
+    await writeAuditLog({ req, action: 'admin.settings.update', targetType: 'settings', targetId: 'platform', metadata: settings })
+    return res.json({ success: true, settings: { ...storedSettings } })
   } catch (error) {
     console.error('Error saving admin settings:', error)
     return res.status(500).json({ success: false, message: 'Failed to save platform settings' })
@@ -261,6 +302,8 @@ router.patch('/settings', authenticate, requireAdmin, async (req, res) => {
 
 // POST /api/admin/broadcast - broadcast emergency warning
 router.post('/broadcast', authenticate, requireAdmin, async (req, res) => {
+  const settings = await getPlatformSettings()
+  if (!settings.broadcastsEnabled) return res.status(503).json({ success: false, message: 'Safety broadcasts are disabled in platform settings' })
   const { title, message, severity, zone } = req.body
   if (!message || !message.trim()) {
     return res.status(400).json({ success: false, message: 'Broadcast alert message is required' })
