@@ -81,6 +81,18 @@ io.on('connection', (socket) => {
     console.log(`Socket identified: ${socket.id} (${socket.data.userId})`)
   })
 
+  socket.on('join_admin_monitoring', async () => {
+    if (socket.data.user?.role !== 'admin') {
+      socket.emit('admin_monitoring_error', { message: 'Admin access required' })
+      return
+    }
+    socket.join('admin:live-journeys')
+    const activeJourneys = await getDb().collection('journeys')
+      .find({ status: 'ACTIVE' }, { projection: { _id: 0, id: 1, latestLocation: 1 } })
+      .toArray()
+    socket.emit('admin_live_journeys_snapshot', { journeys: activeJourneys })
+  })
+
   socket.on('join_journey', async ({ journeyId } = {}) => {
     if (typeof journeyId !== 'string' || !journeyId.trim()) return
     if (!socket.data.userId || !(await findActiveJourney(journeyId.trim(), socket.data.userId))) {
@@ -116,8 +128,13 @@ io.on('connection', (socket) => {
       return
     }
     const location = { journeyId, userId, latitude, longitude, accuracy: typeof accuracy === 'number' ? accuracy : null, timestamp: typeof timestamp === 'number' ? timestamp : Date.now() }
+    await getDb().collection('journeys').updateOne(
+      { id: journeyId, userId, status: 'ACTIVE' },
+      { $set: { latestLocation: location, lastLocationAt: new Date() } },
+    )
     socket.to(`journey:${journeyId}`).emit('location_updated', location)
     socket.emit('location_updated', location)
+    io.to('admin:live-journeys').emit('admin_journey_location', location)
   })
 
   socket.on('join_circle', async ({ circleId } = {}) => {
@@ -186,6 +203,14 @@ io.on('connection', (socket) => {
 })
 async function start() {
   await connectToDatabase()
+  httpServer.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`Port ${port} is already in use. Stop the existing backend process or start this server with a different PORT.`)
+      process.exit(1)
+    }
+    console.error('Backend server failed to start:', error)
+    process.exit(1)
+  })
   httpServer.listen(port, () => {
     console.log(`Women's Safety API listening on port ${port}`)
   })

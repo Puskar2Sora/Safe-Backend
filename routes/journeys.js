@@ -95,6 +95,10 @@ router.post('/', async (req, res) => {
     }
     throw error
   }
+  const io = req.app.get('io')
+  if (io) {
+    io.to('admin:live-journeys').emit('admin_journey_added', { journeyId: journey.id })
+  }
   const { _id, ...journeyResponse } = journey
   return res.status(201).json({ success: true, journey: journeyResponse })
 })
@@ -241,6 +245,7 @@ router.patch('/:id/stop', async (req, res) => {
   if (io) {
     const room = `journey:${journey.id}`
     io.to(room).emit('journey_completed', { journeyId: journey.id })
+    io.to('admin:live-journeys').emit('admin_journey_removed', { journeyId: journey.id })
     const sockets = await io.in(room).fetchSockets()
     sockets.filter((socket) => socket.data.isMonitor).forEach((socket) => socket.disconnect(true))
   }

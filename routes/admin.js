@@ -299,6 +299,50 @@ router.get('/incidents', authenticate, requireAdmin, async (req, res) => {
   }
 })
 
+router.get('/live-journeys', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const db = getDb()
+    const journeys = await db.collection('journeys')
+      .find({ status: 'ACTIVE' }, { projection: { _id: 0 } })
+      .sort({ startTime: -1 })
+      .toArray()
+
+    const users = await db.collection('users')
+      .find({ id: { $in: journeys.map((journey) => journey.userId) } }, {
+        projection: { _id: 0, id: 1, name: 1, email: 1, phone: 1, profileImageUrl: 1 },
+      })
+      .toArray()
+    const usersById = new Map(users.map((user) => [user.id, user]))
+
+    return res.json({
+      success: true,
+      journeys: journeys.map((journey) => ({
+        id: journey.id,
+        userId: journey.userId,
+        status: journey.status,
+        startTime: journey.startTime,
+        origin: journey.origin,
+        destination: journey.destination,
+        selectedRoute: journey.selectedRoute
+          ? {
+              routeId: journey.selectedRoute.routeId,
+              coordinates: journey.selectedRoute.coordinates,
+              distance: journey.selectedRoute.distance,
+              duration: journey.selectedRoute.duration,
+              riskLevel: journey.selectedRoute.riskLevel,
+              riskScore: journey.selectedRoute.riskScore,
+            }
+          : null,
+        latestLocation: journey.latestLocation || null,
+        user: usersById.get(journey.userId) || { id: journey.userId, name: 'Unknown user' },
+      })),
+    })
+  } catch (error) {
+    console.error('Error fetching live admin journeys:', error)
+    return res.status(500).json({ success: false, message: 'Failed to load live journeys' })
+  }
+})
+
 function formatTimeAgo(dateString) {
   if (!dateString) return 'Recently'
   const diff = Date.now() - new Date(dateString).getTime()
