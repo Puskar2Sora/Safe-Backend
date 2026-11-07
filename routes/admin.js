@@ -5,6 +5,62 @@ const { authenticate, requireAdmin } = require('../middleware/auth')
 const { writeAuditLog } = require('../utils/audit')
 
 const router = express.Router()
+const defaultAdminSettings = {
+  alertRadius: '5 km',
+  routingProvider: 'google',
+  autoDispatchEnabled: true,
+}
+
+async function countByDate(collection, field, start, end) {
+  const [result] = await collection.aggregate([
+    {
+      $project: {
+        parsedDate: {
+          $convert: { input: `$${field}`, to: 'date', onError: null, onNull: null },
+        },
+      },
+    },
+    { $match: { parsedDate: { $gte: start, $lte: end } } },
+    { $count: 'count' },
+  ]).toArray()
+  return result?.count || 0
+}
+
+async function latestDate(collection, field) {
+  const [result] = await collection.aggregate([
+    {
+      $project: {
+        parsedDate: {
+          $convert: { input: `$${field}`, to: 'date', onError: null, onNull: null },
+        },
+      },
+    },
+    { $match: { parsedDate: { $ne: null } } },
+    { $sort: { parsedDate: -1 } },
+    { $limit: 1 },
+  ]).toArray()
+  return result?.parsedDate || null
+}
+
+async function monthlyCounts(collection, field) {
+  const rows = await collection.aggregate([
+    {
+      $project: {
+        parsedDate: {
+          $convert: { input: `$${field}`, to: 'date', onError: null, onNull: null },
+        },
+      },
+    },
+    { $match: { parsedDate: { $ne: null } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m', date: '$parsedDate' } },
+        count: { $sum: 1 },
+      },
+    },
+  ]).toArray()
+  return new Map(rows.map((row) => [row._id, row.count]))
+}
 
 // GET /api/admin/stats - returns strictly real metrics computed directly from database collections
 router.get('/stats', authenticate, requireAdmin, async (req, res) => {
@@ -69,32 +125,55 @@ router.get('/stats', authenticate, requireAdmin, async (req, res) => {
 
     // 4. Real Active SOS Alerts Count
     const past24h = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-    const [activeSosAlerts, resolvedEmergenciesRecent] = await Promise.all([
+    const [activeSosAlerts, resolvedEmergenciesRecent, activeEmergenciesWithLocation] = await Promise.all([
       db.collection('emergencies').countDocuments({ status: 'ACTIVE' }),
       db.collection('emergencies').countDocuments({ status: 'RESOLVED', timestamp: { $gte: past24h } }),
+      db.collection('emergencies').countDocuments({
+        status: 'ACTIVE',
+        latitude: { $type: 'number' },
+        longitude: { $type: 'number' },
+      }),
     ])
     const sosChange = resolvedEmergenciesRecent > 0 ? `-${resolvedEmergenciesRecent}` : '0'
+    const responseReadiness = activeSosAlerts === 0
+      ? 100
+      : Math.round((activeEmergenciesWithLocation / activeSosAlerts) * 100)
 
     // 5. Real 7-Day Incident Trend with Dynamic Current Calendar Dates
     const trends = []
-    for (let i = 6; i >= 0; i--) {
-      const dayStart = new Date(now)
-      dayStart.setDate(now.getDate() - i)
-      dayStart.setHours(0, 0, 0, 0)
-
-      const dayEnd = new Date(now)
-      dayEnd.setDate(now.getDate() - i)
-      dayEnd.setHours(23, 59, 59, 999)
-
-      const dateLabel = dayStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      const count = await db.collection('incidents').countDocuments({
-        date: {
-          $gte: dayStart.toISOString(),
-          $lte: dayEnd.toISOString(),
-        },
-      })
-      trends.push({ date: dateLabel, count })
+    const analyticsSeries = {
+      users: [],
+      reports: [],
+      journeys: [],
+      sos: [],
+      broadcasts: [],
     }
+    const dateSources = [
+      [db.collection('users'), 'createdAt'],
+      [db.collection('incidents'), 'date'],
+      [db.collection('journeys'), 'startTime'],
+      [db.collection('emergencies'), 'timestamp'],
+      [db.collection('broadcastAlerts'), 'createdAt'],
+    ]
+    const monthlyMaps = await Promise.all(dateSources.map(([collection, field]) => monthlyCounts(collection, field)))
+    const incidentMap = monthlyMaps[1]
+    const monthKeys = [...new Set(monthlyMaps.flatMap((counts) => [...counts.keys()]))].sort()
+    const chartMonths = monthKeys.length > 0 ? monthKeys : [`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`]
+    const formatMonth = (monthKey) => {
+      const [year, month] = monthKey.split('-').map(Number)
+      return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    }
+
+    chartMonths.forEach((monthKey) => {
+      const dateLabel = formatMonth(monthKey)
+      const count = incidentMap.get(monthKey) || 0
+      trends.push({ date: dateLabel, count })
+      analyticsSeries.users.push({ date: dateLabel, count: monthlyMaps[0].get(monthKey) || 0 })
+      analyticsSeries.reports.push({ date: dateLabel, count })
+      analyticsSeries.journeys.push({ date: dateLabel, count: monthlyMaps[2].get(monthKey) || 0 })
+      analyticsSeries.sos.push({ date: dateLabel, count: monthlyMaps[3].get(monthKey) || 0 })
+      analyticsSeries.broadcasts.push({ date: dateLabel, count: monthlyMaps[4].get(monthKey) || 0 })
+    })
 
     // 6. Real Recent Incidents List (strictly real items)
     const recentIncidentsFromDb = await db.collection('incidents')
@@ -130,11 +209,17 @@ router.get('/stats', authenticate, requireAdmin, async (req, res) => {
         incidentReports,
         highRiskZones,
         activeSosAlerts,
+        responseReadiness,
+        responseReadinessDetails: {
+          activeSosAlerts,
+          activeSosWithLocation: activeEmergenciesWithLocation,
+        },
         userGrowth,
         incidentGrowth,
         riskZoneChange,
         sosChange,
         trends,
+        analyticsSeries,
         recentIncidents,
         mapIncidents,
       },
@@ -142,6 +227,35 @@ router.get('/stats', authenticate, requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error fetching admin stats:', error)
     return res.status(500).json({ success: false, message: 'Failed to fetch admin stats' })
+  }
+})
+
+router.get('/settings', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const stored = await getDb().collection('adminSettings').findOne({ id: 'platform' }, { projection: { _id: 0 } })
+    return res.json({ success: true, settings: { ...defaultAdminSettings, ...(stored || {}) } })
+  } catch (error) {
+    console.error('Error fetching admin settings:', error)
+    return res.status(500).json({ success: false, message: 'Failed to load platform settings' })
+  }
+})
+
+router.patch('/settings', authenticate, requireAdmin, async (req, res) => {
+  const { alertRadius, routingProvider, autoDispatchEnabled } = req.body
+  const validRadii = ['2 km', '5 km', '10 km']
+  const validProviders = ['google', 'mapbox', 'osm']
+  if (!validRadii.includes(alertRadius) || !validProviders.includes(routingProvider) || typeof autoDispatchEnabled !== 'boolean') {
+    return res.status(400).json({ success: false, message: 'Invalid platform settings' })
+  }
+
+  try {
+    const settings = { id: 'platform', alertRadius, routingProvider, autoDispatchEnabled, updatedAt: new Date(), updatedBy: req.user.id }
+    await getDb().collection('adminSettings').replaceOne({ id: 'platform' }, settings, { upsert: true })
+    await writeAuditLog({ req, action: 'admin.settings.update', targetType: 'settings', targetId: 'platform', metadata: { alertRadius, routingProvider, autoDispatchEnabled } })
+    return res.json({ success: true, settings: { ...settings } })
+  } catch (error) {
+    console.error('Error saving admin settings:', error)
+    return res.status(500).json({ success: false, message: 'Failed to save platform settings' })
   }
 })
 
@@ -167,6 +281,14 @@ router.post('/broadcast', authenticate, requireAdmin, async (req, res) => {
     const io = req.app.get('io')
     if (io) {
       io.emit('safety_broadcast', alert)
+      io.to('admin:notifications').emit('admin_notification', {
+        id: alert.id,
+        type: 'broadcast',
+        title: alert.title,
+        message: alert.message,
+        severity: alert.severity,
+        createdAt: alert.createdAt,
+      })
     }
     await writeAuditLog({ req, action: 'admin.broadcast.create', targetType: 'broadcast', targetId: alert.id, metadata: { severity: alert.severity, zone: alert.zone } })
     const { _id, ...resAlert } = alert

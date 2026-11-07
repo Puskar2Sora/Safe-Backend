@@ -87,10 +87,16 @@ io.on('connection', (socket) => {
       return
     }
     socket.join('admin:live-journeys')
+    socket.join('admin:notifications')
     const activeJourneys = await getDb().collection('journeys')
       .find({ status: 'ACTIVE' }, { projection: { _id: 0, id: 1, latestLocation: 1 } })
       .toArray()
     socket.emit('admin_live_journeys_snapshot', { journeys: activeJourneys })
+  })
+
+  socket.on('join_admin_notifications', () => {
+    if (socket.data.user?.role === 'admin') socket.join('admin:notifications')
+    else socket.emit('admin_monitoring_error', { message: 'Admin access required' })
   })
 
   socket.on('join_journey', async ({ journeyId } = {}) => {

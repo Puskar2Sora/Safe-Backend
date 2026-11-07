@@ -36,6 +36,17 @@ router.post('/', async (req, res) => {
     }
 
     await incidentsCollection().insertOne(incident)
+    const io = req.app.get('io')
+    if (io) {
+      io.to('admin:notifications').emit('admin_notification', {
+        id: incident.id,
+        type: 'incident',
+        title: `${incident.severity} incident reported`,
+        message: `${incident.category} reported near ${incident.location}.`,
+        severity: incident.severity,
+        createdAt: incident.date,
+      })
+    }
     // insertOne mutates `incident` in place, adding Mongo's own _id - strip it
     // before responding so API consumers see the exact same shape as before.
     const { _id, ...incidentResponse } = incident

@@ -19,6 +19,17 @@ router.post('/', async (req, res) => {
     status: 'ACTIVE',
   }
   await getDb().collection('emergencies').insertOne(emergency)
+  const io = req.app.get('io')
+  if (io) {
+    io.to('admin:notifications').emit('admin_notification', {
+      id: emergency.id,
+      type: 'sos',
+      title: 'Active SOS alert',
+      message: `Emergency activated by user ${req.user.name || req.user.id}`,
+      severity: 'CRITICAL',
+      createdAt: emergency.timestamp,
+    })
+  }
   const { _id, ...responseEmergency } = emergency
   return res.status(201).json({ success: true, message: 'Emergency activated.', emergency: responseEmergency })
 })

@@ -98,6 +98,14 @@ router.post('/', async (req, res) => {
   const io = req.app.get('io')
   if (io) {
     io.to('admin:live-journeys').emit('admin_journey_added', { journeyId: journey.id })
+    io.to('admin:notifications').emit('admin_notification', {
+      id: `journey-started-${journey.id}`,
+      type: 'journey',
+      title: 'Journey started',
+      message: `A new live journey was started by ${req.user.name || req.user.id}.`,
+      severity: 'MEDIUM',
+      createdAt: startTime || new Date(),
+    })
   }
   const { _id, ...journeyResponse } = journey
   return res.status(201).json({ success: true, journey: journeyResponse })
@@ -246,6 +254,14 @@ router.patch('/:id/stop', async (req, res) => {
     const room = `journey:${journey.id}`
     io.to(room).emit('journey_completed', { journeyId: journey.id })
     io.to('admin:live-journeys').emit('admin_journey_removed', { journeyId: journey.id })
+    io.to('admin:notifications').emit('admin_notification', {
+      id: `journey-stopped-${journey.id}`,
+      type: 'journey',
+      title: 'Journey ended',
+      message: `A live journey was ended by ${req.user.name || req.user.id}.`,
+      severity: 'LOW',
+      createdAt: new Date(),
+    })
     const sockets = await io.in(room).fetchSockets()
     sockets.filter((socket) => socket.data.isMonitor).forEach((socket) => socket.disconnect(true))
   }
