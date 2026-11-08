@@ -28,11 +28,17 @@ router.post('/', async (req, res) => {
   const { name, maxMembers = 5, expiresInMinutes = 60 } = req.body
   const latitude = Number(req.body.latitude)
   const longitude = Number(req.body.longitude)
-  if (!name?.trim() || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return res.status(400).json({ success: false, message: 'Name and current location are required' })
-  if (maxMembers < 2 || maxMembers > 20 || expiresInMinutes <= 0) return res.status(400).json({ success: false, message: 'Circle limits are invalid' })
+  const memberLimit = Number(maxMembers)
+  const expiryMinutes = Number(expiresInMinutes)
+  if (!name?.trim() || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ success: false, message: 'Name and valid current location are required' })
+  }
+  if (!Number.isInteger(memberLimit) || memberLimit < 2 || memberLimit > 20 || !Number.isFinite(expiryMinutes) || expiryMinutes <= 0) {
+    return res.status(400).json({ success: false, message: 'Circle limits are invalid' })
+  }
 
   const now = new Date()
-  const circle = { id: crypto.randomUUID(), creatorId: req.user.id, name: name.trim(), status: 'ACTIVE', maxMembers: Number(maxMembers), createdAt: now, expiresAt: new Date(now.getTime() + Number(expiresInMinutes) * 60000), latitude, longitude }
+  const circle = { id: crypto.randomUUID(), creatorId: req.user.id, name: name.trim(), status: 'ACTIVE', maxMembers: memberLimit, createdAt: now, expiresAt: new Date(now.getTime() + expiryMinutes * 60000), latitude, longitude }
   await circles().insertOne(circle)
   await members().insertOne({ id: crypto.randomUUID(), circleId: circle.id, userId: req.user.id, status: 'ACTIVE', joinedAt: now, leftAt: null })
   const { _id, ...responseCircle } = circle

@@ -1,6 +1,7 @@
 const crypto = require('crypto')
 const express = require('express')
 const { getDb } = require('../config/db')
+const { requireUserId } = require('../middleware/auth')
 
 const router = express.Router()
 const contacts = () => getDb().collection('contacts')
@@ -23,7 +24,7 @@ router.post('/', async (req, res) => {
   return res.status(201).json({ success: true, contact: responseContact })
 })
 
-router.get('/:userId', async (req, res) => {
+router.get('/:userId', requireUserId, async (req, res) => {
   const results = await contacts().find({ userId: req.user.id }, { projection: { _id: 0 } }).toArray()
   return res.json({ success: true, contacts: results })
 })

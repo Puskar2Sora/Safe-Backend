@@ -25,10 +25,16 @@ function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
 }
 
 function verifyPassword(password, storedHash) {
-  const [salt, expectedHash] = String(storedHash || '').split(':')
-  if (!salt || !expectedHash) return false
-  const actualHash = crypto.scryptSync(password, salt, 64).toString('hex')
-  return crypto.timingSafeEqual(Buffer.from(actualHash, 'hex'), Buffer.from(expectedHash, 'hex'))
+  try {
+    const [salt, expectedHash] = String(storedHash || '').split(':')
+    if (!salt || !expectedHash) return false
+    const actualHash = crypto.scryptSync(password, salt, 64).toString('hex')
+    const actualBuffer = Buffer.from(actualHash, 'hex')
+    const expectedBuffer = Buffer.from(expectedHash, 'hex')
+    return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer)
+  } catch {
+    return false
+  }
 }
 
 function publicUser(user) {
