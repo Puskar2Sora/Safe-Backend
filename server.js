@@ -129,8 +129,21 @@ io.on('connection', (socket) => {
 
   socket.on('location_update', async ({ journeyId, userId, latitude, longitude, accuracy, timestamp } = {}) => {
     const coordinatesAreValid = typeof latitude === 'number' && typeof longitude === 'number' && Number.isFinite(latitude) && Number.isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180
-    if (!coordinatesAreValid || typeof journeyId !== 'string' || typeof userId !== 'string' || userId !== socket.data.userId || !(await findActiveJourney(journeyId, userId)) || !socket.rooms.has(`journey:${journeyId}`)) {
+    if (!coordinatesAreValid || typeof journeyId !== 'string' || typeof userId !== 'string' || userId !== socket.data.userId || !socket.rooms.has(`journey:${journeyId}`)) {
       socket.emit('journey_error', { message: 'Location update was not authorized' })
+      return
+    }
+    const activeJ = await findActiveJourney(journeyId, userId)
+    if (!activeJ) {
+      socket.emit('journey_error', { message: 'Active journey not found' })
+      return
+    }
+    const expiresAt = activeJ.expiresAt ? new Date(activeJ.expiresAt) : null
+    if (expiresAt && new Date() >= expiresAt) {
+      if (journeysRoutes.autoExpireJourneys) {
+        await journeysRoutes.autoExpireJourneys(getDb(), io)
+      }
+      socket.emit('journey_completed', { journeyId, reason: 'TIME_LIMIT_EXCEEDED', message: 'Journey auto-stopped because time limit expired' })
       return
     }
     const location = { journeyId, userId, latitude, longitude, accuracy: typeof accuracy === 'number' ? accuracy : null, timestamp: typeof timestamp === 'number' ? timestamp : Date.now() }
@@ -209,6 +222,19 @@ io.on('connection', (socket) => {
 })
 async function start() {
   await connectToDatabase()
+
+  // Periodic background check: auto-expire journeys that exceeded their time limit
+  setInterval(async () => {
+    try {
+      const db = getDb()
+      if (db && journeysRoutes.autoExpireJourneys) {
+        await journeysRoutes.autoExpireJourneys(db, io)
+      }
+    } catch (error) {
+      console.error('Error during journey auto-expire check:', error)
+    }
+  }, 15000)
+
   httpServer.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
       console.error(`Port ${port} is already in use. Stop the existing backend process or start this server with a different PORT.`)

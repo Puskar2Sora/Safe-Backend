@@ -563,6 +563,23 @@ router.get('/analytics', authenticate, requireAdmin, async (req, res) => {
 router.get('/live-journeys', authenticate, requireAdmin, async (req, res) => {
   try {
     const db = getDb()
+
+    // Auto-expire any journeys that exceeded estimated time + 1 hour
+    const allActive = await db.collection('journeys').find({ status: 'ACTIVE' }).toArray()
+    const now = new Date()
+    for (const j of allActive) {
+      const startMs = new Date(j.startTime || j.createdAt || now).getTime()
+      const estimatedSec = Number(j.selectedRoute?.trafficDuration || j.selectedRoute?.duration || j.estimatedDurationSeconds) || 1800
+      const limitSec = Number(j.timeLimitSeconds) || (estimatedSec + 3600)
+      const expiresAt = j.expiresAt ? new Date(j.expiresAt) : new Date(startMs + limitSec * 1000)
+      if (now >= expiresAt) {
+        await db.collection('journeys').updateOne(
+          { id: j.id, status: 'ACTIVE' },
+          { $set: { status: 'COMPLETED', completedAt: now.toISOString(), completionReason: 'TIME_LIMIT_EXCEEDED' } },
+        )
+      }
+    }
+
     const journeys = await db.collection('journeys')
       .find({ status: 'ACTIVE' }, { projection: { _id: 0 } })
       .sort({ startTime: -1 })
@@ -577,26 +594,38 @@ router.get('/live-journeys', authenticate, requireAdmin, async (req, res) => {
 
     return res.json({
       success: true,
-      journeys: journeys.map((journey) => ({
-        id: journey.id,
-        userId: journey.userId,
-        status: journey.status,
-        startTime: journey.startTime,
-        origin: journey.origin,
-        destination: journey.destination,
-        selectedRoute: journey.selectedRoute
-          ? {
-              routeId: journey.selectedRoute.routeId,
-              coordinates: journey.selectedRoute.coordinates,
-              distance: journey.selectedRoute.distance,
-              duration: journey.selectedRoute.duration,
-              riskLevel: journey.selectedRoute.riskLevel,
-              riskScore: journey.selectedRoute.riskScore,
-            }
-          : null,
-        latestLocation: journey.latestLocation || null,
-        user: usersById.get(journey.userId) || { id: journey.userId, name: 'Unknown user' },
-      })),
+      journeys: journeys.map((journey) => {
+        const startMs = new Date(journey.startTime || now).getTime()
+        const estimatedSec = Number(journey.selectedRoute?.trafficDuration || journey.selectedRoute?.duration || journey.estimatedDurationSeconds) || 1800
+        const limitSec = Number(journey.timeLimitSeconds) || (estimatedSec + 3600)
+        const limitMin = Math.ceil(limitSec / 60)
+        const expiresAt = journey.expiresAt || new Date(startMs + limitSec * 1000).toISOString()
+
+        return {
+          id: journey.id,
+          userId: journey.userId,
+          status: journey.status,
+          startTime: journey.startTime,
+          estimatedDurationSeconds: estimatedSec,
+          timeLimitSeconds: limitSec,
+          timeLimitMinutes: limitMin,
+          expiresAt,
+          origin: journey.origin,
+          destination: journey.destination,
+          selectedRoute: journey.selectedRoute
+            ? {
+                routeId: journey.selectedRoute.routeId,
+                coordinates: journey.selectedRoute.coordinates,
+                distance: journey.selectedRoute.distance,
+                duration: journey.selectedRoute.duration,
+                riskLevel: journey.selectedRoute.riskLevel,
+                riskScore: journey.selectedRoute.riskScore,
+              }
+            : null,
+          latestLocation: journey.latestLocation || null,
+          user: usersById.get(journey.userId) || { id: journey.userId, name: 'Unknown user' },
+        }
+      }),
     })
   } catch (error) {
     console.error('Error fetching live admin journeys:', error)
