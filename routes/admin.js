@@ -589,6 +589,35 @@ router.get('/live-journeys', authenticate, requireAdmin, async (req, res) => {
       .find({ id: { $in: journeys.map((journey) => journey.userId) } }, {
         projection: { _id: 0, id: 1, name: 1, email: 1, phone: 1, profileImageUrl: 1 },
       })
+
+      router.post('/journey-check-ins/:journeyId', authenticate, requireAdmin, async (req, res) => {
+        const db = getDb()
+        const journey = await db.collection('journeys').findOne({ id: req.params.journeyId, status: 'ACTIVE' }, { projection: { _id: 0, id: 1, userId: 1 } })
+        if (!journey) return res.status(404).json({ success: false, message: 'Active journey not found' })
+
+        const checkIn = { id: crypto.randomUUID(), sentAt: new Date().toISOString(), respondedAt: null, response: null }
+        await db.collection('journeys').updateOne({ id: journey.id, status: 'ACTIVE' }, { $set: { latestCheckIn: checkIn } })
+        req.app.get('io')?.to(`user:${journey.userId}`).emit('journey_check_in', {
+          journeyId: journey.id,
+          checkInId: checkIn.id,
+          message: 'Your journey is taking longer than expected. Have you reached your destination?',
+        })
+        await writeAuditLog({ req, action: 'admin.journey.check_in', targetType: 'journey', targetId: journey.id })
+        return res.json({ success: true, checkIn })
+      })
+
+      router.patch('/journey-check-ins/:journeyId/escalate', authenticate, requireAdmin, async (req, res) => {
+        const db = getDb()
+        const journey = await db.collection('journeys').findOne({ id: req.params.journeyId, status: 'ACTIVE' }, { projection: { _id: 0, id: 1, userId: 1 } })
+        if (!journey) return res.status(404).json({ success: false, message: 'Active journey not found' })
+        const completedAt = new Date().toISOString()
+        await db.collection('journeys').updateOne({ id: journey.id, status: 'ACTIVE' }, { $set: { status: 'COMPLETED', completedAt, completionReason: 'ADMIN_ESCALATION' } })
+        const io = req.app.get('io')
+        io?.to(`user:${journey.userId}`).emit('journey_completed', { journeyId: journey.id, reason: 'ADMIN_ESCALATION' })
+        io?.to('admin:live-journeys').emit('admin_journey_removed', { journeyId: journey.id })
+        await writeAuditLog({ req, action: 'admin.journey.escalate', targetType: 'journey', targetId: journey.id })
+        return res.json({ success: true })
+      })
       .toArray()
     const usersById = new Map(users.map((user) => [user.id, user]))
 

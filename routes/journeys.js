@@ -434,6 +434,24 @@ router.patch('/:id/extend', async (req, res) => {
       expiresAt: newExpiresAt,
       extraMinutes,
     })
+
+    router.patch('/:id/check-in', async (req, res) => {
+      const response = req.body?.response
+      if (!['YES', 'NO'].includes(response)) return res.status(400).json({ success: false, message: 'Response must be YES or NO' })
+      const journey = await journeysCollection().findOne({ id: req.params.id, userId: req.user.id, status: 'ACTIVE' }, { projection: { _id: 0, id: 1, latestCheckIn: 1 } })
+      if (!journey?.latestCheckIn || journey.latestCheckIn.respondedAt) return res.status(404).json({ success: false, message: 'No check-in is awaiting a response' })
+      const respondedAt = new Date().toISOString()
+      await journeysCollection().updateOne({ id: journey.id }, { $set: { 'latestCheckIn.respondedAt': respondedAt, 'latestCheckIn.response': response } })
+      req.app.get('io')?.to('admin:notifications').emit('admin_notification', {
+        id: `journey-check-in-${journey.id}-${respondedAt}`,
+        type: 'journey',
+        title: response === 'YES' ? 'Journey check-in confirmed' : 'Journey needs assistance',
+        message: response === 'YES' ? 'The user confirmed they have reached the destination.' : 'The user has not reached the destination yet.',
+        severity: response === 'YES' ? 'LOW' : 'HIGH',
+        createdAt: respondedAt,
+      })
+      return res.json({ success: true, response, respondedAt })
+    })
   }
 
   const { _id, ...journeyResponse } = updatedJourney
