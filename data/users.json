@@ -22,7 +22,6 @@
     "isWomanVerified": true,
     "verificationDetails": {
       "voicePitch": 243,
-      "faceVerified": true,
       "verifiedAt": "2026-09-27T16:50:00.783Z"
     }
   },
@@ -35,7 +34,6 @@
     "isWomanVerified": true,
     "verificationDetails": {
       "voicePitch": 298,
-      "faceVerified": true,
       "verifiedAt": "2026-09-14T17:44:47.222Z"
     }
   },
@@ -48,7 +46,6 @@
     "isWomanVerified": true,
     "verificationDetails": {
       "voicePitch": 227,
-      "faceVerified": true,
       "verifiedAt": "2026-10-01T04:10:10.105Z"
     }
   }

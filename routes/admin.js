@@ -401,7 +401,16 @@ router.get('/users', authenticate, requireAdmin, async (req, res) => {
           incidentCount,
           contacts: contactsList,
           latestEmergency: latestEmergency || null,
-          verificationDetails: u.verificationDetails || null,
+          verificationDetails: u.verificationDetails
+            ? {
+                voicePitch: u.verificationDetails.voicePitch,
+                manualReview: u.verificationDetails.manualReview,
+                aiResult: u.verificationDetails.aiResult,
+                verifiedAt: u.verificationDetails.verifiedAt,
+                manuallyVerifiedBy: u.verificationDetails.manuallyVerifiedBy,
+                submittedAt: u.verificationDetails.submittedAt,
+              }
+            : null,
         }
       })
     )
@@ -419,7 +428,10 @@ router.patch('/users/:userId/verify', authenticate, requireAdmin, async (req, re
     const { userId } = req.params
     const { isWomanVerified } = req.body
 
-    const update = { isWomanVerified: Boolean(isWomanVerified) }
+    const update = {
+      isWomanVerified: Boolean(isWomanVerified),
+      verificationStatus: Boolean(isWomanVerified) ? 'APPROVED' : 'REJECTED',
+    }
     if (isWomanVerified) {
       update.verificationDetails = {
         manualReview: true,
