@@ -68,6 +68,7 @@ io.use(async (socket, next) => {
     if (!authenticated) return next(new Error('Authentication is required'))
     socket.data.user = authenticated.user
     socket.data.userId = authenticated.user.id
+    socket.join(`user:${authenticated.user.id}`)
     return next()
   } catch (error) {
     return next(error)

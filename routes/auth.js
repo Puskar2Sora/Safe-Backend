@@ -1,6 +1,7 @@
 const crypto = require('crypto')
 const express = require('express')
 const { getDb } = require('../config/db')
+const { reviewAadhaarDocument } = require('../services/aadhaarReview')
 const { authenticate, requireAdmin } = require('../middleware/auth')
 const { rateLimit } = require('../middleware/rateLimit')
 const { writeAuditLog } = require('../utils/audit')
@@ -12,6 +13,7 @@ const sessionDurationMs = 7 * 24 * 60 * 60 * 1000
 const adminSessionDurationMs = 30 * 60 * 1000
 const maxAvatarSizeBytes = 5 * 1024 * 1024
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: maxAvatarSizeBytes } })
+const verificationUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } })
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -47,6 +49,9 @@ function publicUser(user) {
     role: isAdmin ? 'admin' : (user.role || 'user'),
     isAdmin,
     isWomanVerified: Boolean(user.isWomanVerified || isAdmin),
+    verificationStatus: user.verificationStatus || (user.isWomanVerified || isAdmin ? 'APPROVED' : 'NOT_STARTED'),
+    dateOfBirth: user.dateOfBirth || null,
+    gender: user.gender || null,
     profileImageUrl: user.profileImageUrl || null,
     createdAt: user.createdAt,
   }
@@ -364,20 +369,52 @@ router.post('/profile/avatar', authenticate, (req, res, next) => {
   return res.json({ success: true, user: publicUser(user) })
 })
 
-router.post('/verify-gender', authenticate, async (req, res) => {
-  const { faceVerified, voicePitch } = req.body
-  if (typeof faceVerified !== 'boolean' || typeof voicePitch !== 'number' || !Number.isFinite(voicePitch)) {
-    return res.status(400).json({ success: false, message: 'Missing or invalid verification data' })
+router.post('/verification-submission', authenticate, (req, res, next) => {
+  verificationUpload.single('aadhaar')(req, res, (error) => {
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ success: false, message: 'Aadhaar file must be 10 MB or smaller' })
+    if (error) return next(error)
+    return next()
+  })
+}, async (req, res) => {
+  const { name, dateOfBirth, gender, voicePitch } = req.body
+  if (![name, dateOfBirth, gender].every((value) => typeof value === 'string' && value.trim()) || !['FEMALE', 'MALE', 'OTHER', 'PREFER_NOT_TO_SAY'].includes(gender)) {
+    return res.status(400).json({ success: false, message: 'Name, date of birth, and a valid gender are required' })
   }
-  if (!faceVerified) return res.status(400).json({ success: false, message: 'Facial liveness verification failed' })
-  if (voicePitch < 160) return res.status(400).json({ success: false, message: 'Voice pitch analysis did not meet verification criteria' })
+  const parsedPitch = Number(voicePitch)
+  if (!Number.isFinite(parsedPitch) || parsedPitch < 80 || parsedPitch > 300) return res.status(400).json({ success: false, message: 'A valid voice verification result is required' })
+  if (!req.file || !['image/jpeg', 'image/png', 'application/pdf'].includes(req.file.mimetype)) {
+    return res.status(400).json({ success: false, message: 'A JPG, PNG, or PDF Aadhaar file is required' })
+  }
+
+  let aiResult
+  try {
+    aiResult = await reviewAadhaarDocument({
+      buffer: req.file.buffer,
+      mimetype: req.file.mimetype,
+      submittedName: name.trim(),
+      submittedDateOfBirth: dateOfBirth.trim(),
+      submittedGender: gender,
+    })
+  } catch (error) {
+    console.error('Aadhaar AI review failed:', error)
+    return res.status(502).json({ success: false, message: 'Aadhaar AI review is temporarily unavailable. Please try again.' })
+  }
 
   await getDb().collection('users').updateOne(
     { id: req.user.id },
-    { $set: { isWomanVerified: true, verificationDetails: { voicePitch, faceVerified, verifiedAt: new Date() } } },
+    {
+      $set: {
+        name: name.trim(),
+        dateOfBirth: dateOfBirth.trim(),
+        gender,
+        isWomanVerified: false,
+        verificationStatus: 'AI_PENDING',
+        verificationDetails: { voicePitch: parsedPitch, aiResult, submittedAt: new Date() },
+      },
+    },
   )
   const user = await getDb().collection('users').findOne({ id: req.user.id }, { projection: { _id: 0, passwordHash: 0, password: 0 } })
-  return res.json({ success: true, message: 'Verification successful', user: publicUser(user) })
+  return res.status(202).json({ success: true, message: 'Verification submitted for AI and admin review', user: publicUser(user) })
 })
 
 // Identity & Voice Verification Review Submission Endpoint
